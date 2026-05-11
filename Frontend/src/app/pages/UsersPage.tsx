@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Plus, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Shield, Check, X, ShieldAlert } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { DataTable } from "../components/ui/DataTable";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Modal, ModalFooter } from "../components/ui/Modal";
 import { Input, Select } from "../components/ui/Input";
+import { toast } from "sonner";
+import { authService } from "../../services/auth.service";
 
 const usersData = [
   {
@@ -57,6 +59,43 @@ export function UsersPage() {
     role: "",
     password: "",
   });
+
+  const [requests, setRequests] = useState([]);
+  const [isRequestsLoading, setIsRequestsLoading] = useState(true);
+
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role?.name === "Admin";
+
+  const fetchRequests = async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await authService.getPendingResetRequests();
+      setRequests(data);
+    } catch (error) {
+      // toast.error("Failed to fetch password reset requests");
+    } finally {
+      setIsRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchRequests();
+    } else {
+      setIsRequestsLoading(false);
+    }
+  }, [isAdmin]);
+
+  const handleApprove = async (id: number, email: string) => {
+    try {
+      await authService.approveResetRequest(id);
+      await authService.resetPassword(email);
+      toast.success(`Request approved and password updated for ${email}`);
+      fetchRequests();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Approval failed");
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +197,64 @@ export function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Password Reset Requests */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-orange-500" />
+              Pending Password Reset Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              columns={[
+                { 
+                  key: "user", 
+                  label: "User", 
+                  render: (user: any) => (
+                    <div>
+                      <div className="font-medium text-gray-900">{user.firstName} {user.lastName}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  )
+                },
+                { 
+                  key: "createdAt", 
+                  label: "Requested Date",
+                  render: (value: string) => new Date(value).toLocaleString()
+                },
+                {
+                  key: "actions",
+                  label: "Actions",
+                  render: (_: any, row: any) => (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="success" 
+                        size="sm" 
+                        onClick={() => handleApprove(row.id, row.user.email)}
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Approve
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
+                        <X className="w-4 h-4 mr-1" />
+                        Denial
+                      </Button>
+                    </div>
+                  )
+                }
+              ]}
+              data={requests}
+              isLoading={isRequestsLoading}
+              searchPlaceholder="Search requests..."
+            />
+          </CardContent>
+        </Card>
+      )}
+
+
 
       {/* Add User Modal */}
       <Modal

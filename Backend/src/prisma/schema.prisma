@@ -10,6 +10,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model PasswordResetRequest {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  user            User          @relation(fields: [userId], references: [id])
+  proposedPassword String?      @map("proposed_password")
+  status          RequestStatus @default(PENDING)
+  adminId         Int?          @map("admin_id")
+  admin           User?         @relation("AdminApprovals", fields: [adminId], references: [id])
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("password_reset_requests")
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -60,21 +81,169 @@ model User {
   lastLogin DateTime?  @map("last_login")
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
+  
+  resetRequests PasswordResetRequest[]
+  adminApprovals PasswordResetRequest[] @relation("AdminApprovals")
 
   @@map("users")
 }
 
+enum ProductStatus {
+  ACTIVE       @map("Active")
+  OUT_OF_STOCK @map("Out of Stock")
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
 model Product {
-  id          Int      @id @default(autoincrement())
-  name        String
-  sku         String   @unique
-  category    String
-  price       Float
-  stock       Int      @default(0)
-  description String?
-  status      String   @default("Active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id            Int           @id @default(autoincrement())
+  name          String
+  sku           String        @unique
+  categoryId    Int           @map("category_id")
+  category      Category      @relation(fields: [categoryId], references: [id])
+  price         Float
+  stockQuantity Int           @default(0) @map("stock_quantity")
+  description   String?
+  status        ProductStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
   @@map("products")
 }
+
+enum Region {
+  NORTH @map("North")
+  SOUTH @map("South")
+  EAST  @map("East")
+  WEST  @map("West")
+}
+
+model Dealer {
+  id            Int      @id @default(autoincrement())
+  name          String
+  contactPerson String   @map("contact_person")
+  phone         String
+  region        Region?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("dealers")
+}
+
+model Supplier {
+  id            Int      @id @default(autoincrement())
+  name          String
+  contactPerson String   @map("contact_person")
+  phone         String
+  productType   String   @map("product_type")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("suppliers")
+}
+
+model VetDoc {
+  id         Int      @id @default(autoincrement())
+  doctorName String   @map("doctor_name")
+  specialty  String
+  phone      String
+  region     Region?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("vet_docs")
+}
+
+
+model SHG {
+  id              Int      @id @default(autoincrement())
+  groupName       String   @map("group_name")
+  leaderName      String   @map("leader_name")
+  numberOfMembers Int      @map("number_of_members")
+  region          Region?
+  activity        String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("shg")
+}
+
+
+enum VehicleType {
+  TRUCK @map("Truck")
+  VAN   @map("Van")
+  BIKE  @map("Bike")
+  OTHER @map("Other")
+}
+
+model Transporter {
+  id            Int          @id @default(autoincrement())
+  name          String
+  contactPerson String       @map("contact_person")
+  phone         String
+  vehicleType   VehicleType? @map("vehicle_type")
+  region        Region?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@map("transporters")
+}
+
+enum Platform {
+  FACEBOOK  @map("Facebook")
+  INSTAGRAM @map("Instagram")
+  LINKEDIN  @map("LinkedIn")
+  TWITTER   @map("Twitter")
+  YOUTUBE   @map("YouTube")
+}
+
+model ContentPlan {
+  id            Int       @id @default(autoincrement())
+  campaignTitle String    @map("campaign_title")
+  platform      Platform?
+  startDate     DateTime  @map("start_date")
+  endDate       DateTime  @map("end_date")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("content_plans")
+}
+
+enum DesignType {
+  BANNER         @map("Banner")
+  FLYER          @map("Flyer")
+  SOCIAL_POST    @map("Social Post")
+  EMAIL_TEMPLATE @map("Email Template")
+  POSTER         @map("Poster")
+}
+
+enum DesignStatus {
+  DRAFT     @map("Draft")
+  APPROVED  @map("Approved")
+  IN_REVIEW @map("In Review")
+}
+
+model PromotionDesign {
+  id          Int          @id @default(autoincrement())
+  designTitle String       @map("design_title")
+  type        DesignType?
+  status      DesignStatus @default(DRAFT)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("promotion_designs")
+}
+
+
+
+
+
+

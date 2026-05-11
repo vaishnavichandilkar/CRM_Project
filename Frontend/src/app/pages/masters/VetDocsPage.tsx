@@ -1,16 +1,12 @@
 import { MasterPageTemplate } from "../../components/MasterPageTemplate";
-
-const vetDocsData = [
-  { id: 1, name: "Dr. Smith", specialty: "Cattle", phone: "+1234567890", region: "North", status: "Active" },
-  { id: 2, name: "Dr. Johnson", specialty: "Poultry", phone: "+1234567891", region: "South", status: "Active" },
-];
+import { vetDocsService } from "../../../services/vetDocs.service";
 
 export function VetDocsPage() {
   return (
     <MasterPageTemplate
       title="Vet Docs"
-      description="Manage veterinary doctors"
-      data={vetDocsData}
+      description="Manage your network of veterinary doctors"
+      service={vetDocsService}
       columns={[
         { key: "name", label: "Doctor Name", sortable: true },
         { key: "specialty", label: "Specialty", sortable: true },

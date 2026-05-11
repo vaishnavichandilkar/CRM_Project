@@ -11,9 +11,22 @@ export function LoginPage() {
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/");
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await authService.login(formData.userId, formData.password);
+      navigate("/");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Invalid credentials");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -27,6 +40,12 @@ export function LoginPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
             <p className="text-gray-600">Sign in to your CRM account</p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm text-center">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -68,13 +87,13 @@ export function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
-              <button type="button" className="text-sm text-blue-600 hover:underline">
+              <Link to="/forgot-password" size="sm" className="text-sm text-blue-600 hover:underline">
                 Forgot Password?
-              </button>
+              </Link>
             </div>
 
-            <Button type="submit" variant="primary" className="w-full" size="lg">
-              Sign In
+            <Button type="submit" variant="primary" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
 

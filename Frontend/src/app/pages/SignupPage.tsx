@@ -22,6 +22,10 @@ export function SignupPage() {
       return;
     }
 
+    const nameParts = formData.name.trim().split(/\s+/);
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || " ";
+
     try {
       const response = await fetch("http://localhost:5000/auth/signup", {
         method: "POST",
@@ -29,7 +33,8 @@ export function SignupPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: formData.name,
+          firstName,
+          lastName,
           email: formData.email,
           password: formData.password,
         }),

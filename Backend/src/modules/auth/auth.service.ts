@@ -88,4 +88,97 @@ export class AuthService {
       },
     };
   }
+
+  async requestPasswordReset(dto: { email: string; proposedPassword?: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      throw new ConflictException('User not found');
+    }
+
+    // Hash the proposed password before storing
+    let hashedProposed = null;
+    if (dto.proposedPassword) {
+      hashedProposed = await bcrypt.hash(dto.proposedPassword, 10);
+    }
+
+    return this.prisma.passwordResetRequest.create({
+      data: {
+        userId: user.id,
+        proposedPassword: hashedProposed,
+        status: 'PENDING',
+      },
+    });
+  }
+
+  async resetPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new ConflictException('User not found');
+    }
+
+    const request = await this.prisma.passwordResetRequest.findFirst({
+      where: {
+        userId: user.id,
+        status: 'APPROVED',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!request) {
+      throw new UnauthorizedException('Password reset request not approved by admin');
+    }
+
+    if (!request.proposedPassword) {
+      throw new ConflictException('No proposed password found in the request');
+    }
+
+    // Apply the proposed password
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: request.proposedPassword },
+    });
+
+    // Mark as completed
+    await this.prisma.passwordResetRequest.update({
+      where: { id: request.id },
+      data: { status: 'COMPLETED' },
+    });
+
+    return { message: 'Password has been reset successfully' };
+  }
+
+  async approveResetRequest(requestId: number, adminId: number) {
+    return this.prisma.passwordResetRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'APPROVED',
+        adminId: adminId,
+      },
+    });
+  }
+
+  async getPendingRequests() {
+    return this.prisma.passwordResetRequest.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
+
+

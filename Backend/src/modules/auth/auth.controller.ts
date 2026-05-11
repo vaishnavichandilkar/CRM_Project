@@ -2,6 +2,8 @@ import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { Public } from './decorators/public.decorator';
@@ -35,5 +37,20 @@ export class AuthController {
   logout() {
     return { message: 'Logged out successfully' };
   }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request a password reset (Proposed password stored for admin approval)' })
+  @ApiResponse({ status: 200, description: 'Reset request sent to admin.' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Finalize password reset (Only works if admin approved)' })
+  @ApiResponse({ status: 200, description: 'Password successfully reset.' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.email);
+  }
 }
+
 

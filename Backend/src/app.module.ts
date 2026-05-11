@@ -2,9 +2,15 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { MailModule } from './infrastructure/mail/mail.module';
 import { UsersModule } from './modules/users/users.module';
 import { ProductsModule } from './modules/products/products.module';
+import { DealersModule } from './modules/dealers/dealers.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
+import { TransportersModule } from './modules/transporters/transporters.module';
+import { VetDocsModule } from './modules/vet-docs/vet-docs.module';
+import { SHGModule } from './modules/shg/shg.module';
+import { ContentPlansModule } from './modules/content-plans/content-plans.module';
+import { PromotionDesignsModule } from './modules/promotion-designs/promotion-designs.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -16,10 +22,16 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       isGlobal: true,
     }),
     PrismaModule,
-    MailModule,
     AuthModule,
     UsersModule,
     ProductsModule,
+    DealersModule,
+    SuppliersModule,
+    TransportersModule,
+    VetDocsModule,
+    SHGModule,
+    ContentPlansModule,
+    PromotionDesignsModule,
     RolesModule,
   ],
   controllers: [],

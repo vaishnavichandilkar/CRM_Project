@@ -8,6 +8,7 @@ import { SalesPage } from "./pages/SalesPage";
 import { VisitsPage } from "./pages/VisitsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 
 // Masters pages
 import { ProductsPage } from "./pages/masters/ProductsPage";
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
   {
     path: "/signup",
     Component: SignupPage,
+  },
+  {
+    path: "/forgot-password",
+    Component: ForgotPasswordPage,
   },
   {
     path: "/",
