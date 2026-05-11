@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./api";
 
 export interface Category {
   id: number;
@@ -6,17 +6,15 @@ export interface Category {
 }
 
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   sku: string;
-  categoryId: number;
-  category?: Category;
   price: number;
   stockQuantity: number;
   description?: string;
-  status: string;
+  category: Category;
+  status: 'Active' | 'Out of Stock';
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreateProductDto {
@@ -31,30 +29,18 @@ export interface CreateProductDto {
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
 
 export const productsService = {
-  getAll: async (search?: string) => {
-    const response = await api.get<Product[]>('/products', {
-      params: { search },
-    });
-    return response.data;
-  },
-
-  create: async (data: CreateProductDto) => {
-    const response = await api.post<Product>('/products', data);
-    return response.data;
-  },
-
-  update: async (id: number, data: UpdateProductDto) => {
-    const response = await api.patch<Product>(`/products/${id}`, data);
-    return response.data;
-  },
-
-  delete: async (id: number) => {
-    const response = await api.delete(`/products/${id}`);
-    return response.data;
-  },
-
-  getCategories: async () => {
-    const response = await api.get<Category[]>('/categories');
-    return response.data;
-  },
+  getAll: (searchQuery?: string) => 
+    api.get<Product[]>("/products", { params: { search: searchQuery } }).then((r) => r.data),
+  
+  create: (data: CreateProductDto) => 
+    api.post<Product>("/products", data).then((r) => r.data),
+  
+  update: (id: string, data: UpdateProductDto) => 
+    api.put<Product>(`/products/${id}`, data).then((r) => r.data),
+  
+  delete: (id: string) => 
+    api.delete(`/products/${id}`).then((r) => r.data),
+    
+  getCategories: () => 
+    api.get<Category[]>("/categories").then((r) => r.data),
 };

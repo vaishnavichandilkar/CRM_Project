@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router";
 import {
   LayoutDashboard, Users, ShoppingCart, MapPin, BarChart3,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Modal, ModalFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { authService } from "../../../services/auth.service";
 
 export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -15,8 +16,17 @@ export function MainLayout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const navigate = useNavigate();
+  
+  const user = authService.getCurrentUser();
+
+  useEffect(() => {
+    if (!authService.isAuthenticated()) {
+      navigate("/login");
+    }
+  }, [navigate]);
 
   const handleLogout = () => {
+    authService.logout();
     setShowLogoutModal(false);
     navigate("/login");
   };
@@ -149,8 +159,8 @@ export function MainLayout() {
                 <User className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="font-medium text-sm">Admin User</div>
-                <div className="text-xs text-gray-500">Administrator</div>
+                <div className="font-medium text-sm">{user ? `${user.firstName} ${user.lastName}` : "User"}</div>
+                <div className="text-xs text-gray-500">{user?.role?.name || "Guest"}</div>
               </div>
             </div>
           </div>

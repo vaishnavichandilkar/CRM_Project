@@ -12,6 +12,8 @@ import { SHGModule } from './modules/shg/shg.module';
 import { ContentPlansModule } from './modules/content-plans/content-plans.module';
 import { PromotionDesignsModule } from './modules/promotion-designs/promotion-designs.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { TeamModule } from './modules/team/team.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
@@ -33,6 +35,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     ContentPlansModule,
     PromotionDesignsModule,
     RolesModule,
+    CustomersModule,
+    TeamModule,
   ],
   controllers: [],
   providers: [

@@ -2,52 +2,49 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { Lock, User, Mail, UserPlus } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { authService } from "../../services/auth.service";
+import { toast } from "sonner";
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
-  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
+    
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
+      return toast.error("Passwords do not match");
+    }
+
+    if (formData.password.length < 6) {
+      return toast.error("Password must be at least 6 characters long");
     }
 
     const nameParts = formData.name.trim().split(/\s+/);
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || " ";
 
+    setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email: formData.email,
-          password: formData.password,
-        }),
+      await authService.signup({
+        firstName,
+        lastName,
+        email: formData.email,
+        password: formData.password,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to sign up");
-      }
-
+      toast.success("Account created successfully! Please sign in.");
       navigate("/login");
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.response?.data?.message || "Failed to sign up");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,11 +60,6 @@ export function SignupPage() {
             <p className="text-gray-600">Join our CRM platform today</p>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -138,8 +130,8 @@ export function SignupPage() {
               </div>
             </div>
 
-            <Button type="submit" variant="primary" className="w-full" size="lg">
-              Sign Up
+            <Button type="submit" variant="primary" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "Creating Account..." : "Sign Up"}
             </Button>
           </form>
 

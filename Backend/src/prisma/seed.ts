@@ -117,6 +117,22 @@ async function main() {
     },
   });
 
+  // 5. Create Initial Categories
+  const categoriesData = [
+    { name: 'Electronics' },
+    { name: 'Hardware' },
+    { name: 'Software' },
+    { name: 'Office Supplies' },
+  ];
+
+  for (const c of categoriesData) {
+    await prisma.category.upsert({
+      where: { name: c.name },
+      update: {},
+      create: c,
+    });
+  }
+
   console.log('Seeding completed successfully!');
 }
 

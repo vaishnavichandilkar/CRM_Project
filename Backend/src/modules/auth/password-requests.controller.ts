@@ -10,7 +10,7 @@ export class PasswordRequestsController {
   constructor(private authService: AuthService) {}
 
   @Get('pending')
-  @Roles('Admin') // Based on common project naming, or use 'Admin'
+  @Roles('Admin')
   @ApiOperation({ summary: 'Get all pending password reset requests (Admin only)' })
   getPending() {
     return this.authService.getPendingRequests();
@@ -19,8 +19,14 @@ export class PasswordRequestsController {
   @Post(':id/approve')
   @Roles('Admin')
   @ApiOperation({ summary: 'Approve a password reset request (Admin only)' })
-  approve(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    const adminId = req.user.id;
-    return this.authService.approveResetRequest(id, adminId);
+  approve(@Param('id') id: string) {
+    return this.authService.approveResetRequest(id);
+  }
+
+  @Post(':id/reject')
+  @Roles('Admin')
+  @ApiOperation({ summary: 'Reject a password reset request (Admin only)' })
+  reject(@Param('id') id: string) {
+    return this.authService.rejectResetRequest(id);
   }
 }

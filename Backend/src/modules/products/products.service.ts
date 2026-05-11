@@ -29,6 +29,7 @@ export class ProductsService {
       include: {
         category: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -49,6 +50,7 @@ export class ProductsService {
       include: {
         category: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -63,6 +65,7 @@ export class ProductsService {
       include: {
         category: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -105,6 +108,7 @@ export class ProductsService {
       include: {
         category: {
           select: {
+            id: true,
             name: true,
           },
         },

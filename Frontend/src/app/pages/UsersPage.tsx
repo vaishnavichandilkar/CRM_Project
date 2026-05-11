@@ -8,55 +8,19 @@ import { Modal, ModalFooter } from "../components/ui/Modal";
 import { Input, Select } from "../components/ui/Input";
 import { toast } from "sonner";
 import { authService } from "../../services/auth.service";
-
-const usersData = [
-  {
-    id: 1,
-    name: "Admin User",
-    email: "admin@crm.com",
-    role: "Admin",
-    status: "Active",
-    lastLogin: "2026-04-29 10:30",
-  },
-  {
-    id: 2,
-    name: "Sarah Wilson",
-    email: "sarah@crm.com",
-    role: "Sales Rep",
-    status: "Active",
-    lastLogin: "2026-04-29 09:15",
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "mike@crm.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "2026-04-28 16:45",
-  },
-  {
-    id: 4,
-    name: "Tom Brown",
-    email: "tom@crm.com",
-    role: "Sales Rep",
-    status: "Inactive",
-    lastLogin: "2026-04-20 14:20",
-  },
-];
-
-const rolePermissions = {
-  Admin: ["Full Access", "User Management", "System Settings", "Reports", "Sales", "Leads"],
-  Manager: ["Reports", "Sales", "Leads", "Team Management", "Approvals"],
-  "Sales Rep": ["Leads", "Sales", "Visits", "Basic Reports"],
-};
+import { usersRolesService, User, Role } from "../../services/users-roles.service";
 
 export function UsersPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    role: "",
+    roleId: "",
     password: "",
   });
 
@@ -66,52 +30,93 @@ export function UsersPage() {
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role?.name === "Admin";
 
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [usersData, rolesData] = await Promise.all([
+        usersRolesService.getUsers(),
+        usersRolesService.getRoles()
+      ]);
+      setUsers(usersData);
+      setRoles(rolesData);
+    } catch (error) {
+      toast.error("Failed to fetch users and roles");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const fetchRequests = async () => {
     if (!isAdmin) return;
+    setIsRequestsLoading(true);
     try {
       const data = await authService.getPendingResetRequests();
       setRequests(data);
     } catch (error) {
-      // toast.error("Failed to fetch password reset requests");
+      console.error("Failed to fetch requests", error);
     } finally {
       setIsRequestsLoading(false);
     }
   };
 
   useEffect(() => {
+    fetchData();
     if (isAdmin) {
       fetchRequests();
-    } else {
-      setIsRequestsLoading(false);
     }
   }, [isAdmin]);
 
-  const handleApprove = async (id: number, email: string) => {
+  const handleApprove = async (id: string, email: string) => {
     try {
       await authService.approveResetRequest(id);
-      await authService.resetPassword(email);
-      toast.success(`Request approved and password updated for ${email}`);
+      toast.success(`Password reset request approved for ${email}`);
       fetchRequests();
+      fetchData(); // Update user list if needed (e.g. status)
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Approval failed");
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleReject = async (id: string, email: string) => {
+    try {
+      await authService.rejectResetRequest(id);
+      toast.success(`Password reset request rejected for ${email}`);
+      fetchRequests();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Rejection failed");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsModalOpen(false);
+    try {
+      await usersRolesService.createUser({
+        ...formData,
+        roleId: parseInt(formData.roleId),
+      });
+      toast.success("User created successfully");
+      setIsModalOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to create user");
+    }
   };
 
   const columns = [
-    { key: "name", label: "Name", sortable: true },
+    { 
+      key: "name", 
+      label: "Name", 
+      sortable: true,
+      render: (_: any, row: User) => `${row.firstName} ${row.lastName}`
+    },
     { key: "email", label: "Email", sortable: true },
     {
       key: "role",
       label: "Role",
       sortable: true,
-      render: (value: string) => {
-        const variant = value === "Admin" ? "danger" : value === "Manager" ? "warning" : "info";
-        return <Badge variant={variant}>{value}</Badge>;
+      render: (role: Role) => {
+        const variant = role.name === "Admin" ? "danger" : role.name === "Manager" ? "warning" : "info";
+        return <Badge variant={variant}>{role.name}</Badge>;
       },
     },
     {
@@ -119,12 +124,23 @@ export function UsersPage() {
       label: "Status",
       sortable: true,
       render: (value: string) => {
-        const variant = value === "Active" ? "success" : "default";
+        const variant = value === "ACTIVE" ? "success" : "default";
         return <Badge variant={variant}>{value}</Badge>;
       },
     },
-    { key: "lastLogin", label: "Last Login", sortable: true },
+    { 
+      key: "lastLogin", 
+      label: "Last Login", 
+      sortable: true,
+      render: (value: string) => value ? new Date(value).toLocaleString() : "Never"
+    },
   ];
+
+  const rolePermissions = {
+    Admin: ["Full Access", "User Management", "System Settings", "Reports", "Sales", "Leads"],
+    Manager: ["Reports", "Sales", "Leads", "Team Management", "Approvals"],
+    "Sales Rep": ["Leads", "Sales", "Visits", "Basic Reports"],
+  };
 
   return (
     <div className="space-y-6">
@@ -141,30 +157,30 @@ export function UsersPage() {
 
       {/* Role Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(rolePermissions).map(([role, permissions]) => (
-          <Card key={role}>
+        {roles.map((role) => (
+          <Card key={role.id}>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className={`p-3 rounded-lg ${
-                  role === "Admin" ? "bg-red-100" :
-                  role === "Manager" ? "bg-yellow-100" :
+                  role.name === "Admin" ? "bg-red-100" :
+                  role.name === "Manager" ? "bg-yellow-100" :
                   "bg-blue-100"
                 }`}>
                   <Shield className={`w-6 h-6 ${
-                    role === "Admin" ? "text-red-600" :
-                    role === "Manager" ? "text-yellow-600" :
+                    role.name === "Admin" ? "text-red-600" :
+                    role.name === "Manager" ? "text-yellow-600" :
                     "text-blue-600"
                   }`} />
                 </div>
                 <div>
-                  <div className="font-semibold text-lg">{role}</div>
+                  <div className="font-semibold text-lg">{role.name}</div>
                   <div className="text-sm text-gray-600">
-                    {usersData.filter(u => u.role === role).length} users
+                    {users.filter(u => u.role.id === role.id).length} users
                   </div>
                 </div>
               </div>
               <div className="space-y-1">
-                {permissions.map((perm, index) => (
+                {(rolePermissions[role.name as keyof typeof rolePermissions] || []).map((perm, index) => (
                   <div key={index} className="text-sm text-gray-600 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
                     {perm}
@@ -175,7 +191,7 @@ export function UsersPage() {
                 variant="ghost"
                 size="sm"
                 className="w-full mt-4"
-                onClick={() => setSelectedRole(role)}
+                onClick={() => setSelectedRole(role.name)}
               >
                 View Details
               </Button>
@@ -192,7 +208,8 @@ export function UsersPage() {
         <CardContent>
           <DataTable
             columns={columns}
-            data={usersData}
+            data={users}
+            isLoading={isLoading}
             searchPlaceholder="Search users..."
           />
         </CardContent>
@@ -221,7 +238,7 @@ export function UsersPage() {
                   )
                 },
                 { 
-                  key: "createdAt", 
+                  key: "requestedAt", 
                   label: "Requested Date",
                   render: (value: string) => new Date(value).toLocaleString()
                 },
@@ -233,14 +250,19 @@ export function UsersPage() {
                       <Button 
                         variant="success" 
                         size="sm" 
-                        onClick={() => handleApprove(row.id, row.user.email)}
+                        onClick={() => handleApprove(row.id, row.email)}
                       >
                         <Check className="w-4 h-4 mr-1" />
                         Approve
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={() => handleReject(row.id, row.email)}
+                      >
                         <X className="w-4 h-4 mr-1" />
-                        Denial
+                        Reject
                       </Button>
                     </div>
                   )
@@ -266,11 +288,18 @@ export function UsersPage() {
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Full Name"
+              label="First Name"
               required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter full name"
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              placeholder="Enter first name"
+            />
+            <Input
+              label="Last Name"
+              required
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              placeholder="Enter last name"
             />
             <Input
               label="Email"
@@ -283,13 +312,9 @@ export function UsersPage() {
             <Select
               label="Role"
               required
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              options={[
-                { value: "Admin", label: "Admin" },
-                { value: "Manager", label: "Manager" },
-                { value: "Sales Rep", label: "Sales Rep" },
-              ]}
+              value={formData.roleId}
+              onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+              options={roles.map(r => ({ value: r.id.toString(), label: r.name }))}
             />
             <Input
               label="Password"

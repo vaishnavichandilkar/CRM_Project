@@ -42,6 +42,7 @@ export class AuthService {
         lastName: dto.lastName,
         password: hashedPassword,
         roleId: role.id,
+        status: 'ACTIVE',
       },
     });
 
@@ -67,14 +68,39 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User account is inactive. Please contact admin.');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      // Check if user is trying to use ANY pending requested password
+      const pendingRequests = await this.prisma.passwordResetRequest.findMany({
+        where: {
+          userId: user.id,
+          status: 'PENDING',
+        },
+      });
+
+      for (const req of pendingRequests) {
+        const isPendingMatch = await bcrypt.compare(dto.password, req.requestedPassword);
+        if (isPendingMatch) {
+          throw new UnauthorizedException('Your password reset request is pending admin approval. Please use your old password or wait for approval.');
+        }
+      }
+
+      throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Update last login
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
 
     const payload = { sub: user.id, email: user.email, role: user.role.name };
     return {
@@ -85,6 +111,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        status: user.status,
       },
     };
   }
@@ -95,70 +122,74 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ConflictException('User not found');
+      throw new ConflictException('User not found with this email');
     }
 
     // Hash the proposed password before storing
-    let hashedProposed = null;
-    if (dto.proposedPassword) {
-      hashedProposed = await bcrypt.hash(dto.proposedPassword, 10);
+    if (!dto.proposedPassword) {
+      throw new ConflictException('Proposed password is required');
     }
+    
+    const hashedProposed = await bcrypt.hash(dto.proposedPassword, 10);
 
     return this.prisma.passwordResetRequest.create({
       data: {
         userId: user.id,
-        proposedPassword: hashedProposed,
+        email: dto.email,
+        requestedPassword: hashedProposed,
         status: 'PENDING',
       },
     });
   }
 
-  async resetPassword(email: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new ConflictException('User not found');
-    }
-
-    const request = await this.prisma.passwordResetRequest.findFirst({
-      where: {
-        userId: user.id,
-        status: 'APPROVED',
-      },
-      orderBy: { createdAt: 'desc' },
+  async approveResetRequest(requestId: string) {
+    const request = await this.prisma.passwordResetRequest.findUnique({
+      where: { id: requestId },
+      include: { user: true },
     });
 
     if (!request) {
-      throw new UnauthorizedException('Password reset request not approved by admin');
+      throw new ConflictException('Reset request not found');
     }
 
-    if (!request.proposedPassword) {
-      throw new ConflictException('No proposed password found in the request');
+    if (request.status !== 'PENDING') {
+      throw new ConflictException(`Request is already ${request.status}`);
     }
 
-    // Apply the proposed password
+    // Update user password
     await this.prisma.user.update({
-      where: { id: user.id },
-      data: { password: request.proposedPassword },
+      where: { id: request.userId },
+      data: { password: request.requestedPassword },
     });
 
-    // Mark as completed
-    await this.prisma.passwordResetRequest.update({
-      where: { id: request.id },
-      data: { status: 'COMPLETED' },
-    });
-
-    return { message: 'Password has been reset successfully' };
-  }
-
-  async approveResetRequest(requestId: number, adminId: number) {
+    // Update request status
     return this.prisma.passwordResetRequest.update({
       where: { id: requestId },
       data: {
         status: 'APPROVED',
-        adminId: adminId,
+        approvedAt: new Date(),
+      },
+    });
+  }
+
+  async rejectResetRequest(requestId: string) {
+    const request = await this.prisma.passwordResetRequest.findUnique({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      throw new ConflictException('Reset request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new ConflictException(`Request is already ${request.status}`);
+    }
+
+    return this.prisma.passwordResetRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'REJECTED',
+        rejectedAt: new Date(),
       },
     });
   }
@@ -176,7 +207,7 @@ export class AuthService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { requestedAt: 'desc' },
     });
   }
 }

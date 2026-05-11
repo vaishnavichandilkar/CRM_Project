@@ -5,8 +5,8 @@ export interface Transporter {
   name: string;
   contactPerson: string;
   phone: string;
-  vehicleType: 'Truck' | 'Van' | 'Bike' | 'Other';
-  region: 'North' | 'South' | 'East' | 'West';
+  vehicleType?: 'TRUCK' | 'VAN' | 'BIKE' | 'OTHER';
+  region?: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST';
   createdAt: string;
 }
 
@@ -21,24 +21,15 @@ export interface CreateTransporterDto {
 export interface UpdateTransporterDto extends Partial<CreateTransporterDto> {}
 
 export const transportersService = {
-  getAll: async (searchQuery?: string) => {
-    const response = await api.get<Transporter[]>("/transporters", {
-      params: { search: searchQuery },
-    });
-    return response.data;
-  },
-
-  create: async (data: CreateTransporterDto) => {
-    const response = await api.post<Transporter>("/transporters", data);
-    return response.data;
-  },
-
-  update: async (id: number, data: UpdateTransporterDto) => {
-    const response = await api.patch<Transporter>(`/transporters/${id}`, data);
-    return response.data;
-  },
-
-  delete: async (id: number) => {
-    await api.delete(`/transporters/${id}`);
-  },
+  getAll: (searchQuery?: string) =>
+    api.get<Transporter[]>("/transporters", { params: { search: searchQuery } }).then((r) => r.data),
+  
+  create: (data: CreateTransporterDto) =>
+    api.post<Transporter>("/transporters", data).then((r) => r.data),
+  
+  update: (id: number, data: UpdateTransporterDto) =>
+    api.put<Transporter>(`/transporters/${id}`, data).then((r) => r.data),
+  
+  delete: (id: number) =>
+    api.delete(`/transporters/${id}`).then((r) => r.data),
 };

@@ -45,8 +45,13 @@ export const authService = {
     return response.data;
   },
 
-  approveResetRequest: async (id: number) => {
+  approveResetRequest: async (id: string) => {
     const response = await api.post(`/auth/password-requests/${id}/approve`);
+    return response.data;
+  },
+
+  rejectResetRequest: async (id: string) => {
+    const response = await api.post(`/auth/password-requests/${id}/reject`);
     return response.data;
   }
 };

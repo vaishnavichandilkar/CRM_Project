@@ -44,13 +44,6 @@ export class AuthController {
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.requestPasswordReset(dto);
   }
-
-  @Post('reset-password')
-  @ApiOperation({ summary: 'Finalize password reset (Only works if admin approved)' })
-  @ApiResponse({ status: 200, description: 'Password successfully reset.' })
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.email);
-  }
 }
 
 

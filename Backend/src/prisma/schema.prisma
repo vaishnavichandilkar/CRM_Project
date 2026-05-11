@@ -10,23 +10,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum RequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  COMPLETED
-}
 
 model PasswordResetRequest {
-  id              Int           @id @default(autoincrement())
-  userId          Int           @map("user_id")
-  user            User          @relation(fields: [userId], references: [id])
-  proposedPassword String?      @map("proposed_password")
-  status          RequestStatus @default(PENDING)
-  adminId         Int?          @map("admin_id")
-  admin           User?         @relation("AdminApprovals", fields: [adminId], references: [id])
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id                String    @id @default(cuid())
+  userId            Int       @map("user_id")
+  email             String
+  requestedPassword String    @map("requested_password")
+  status            String    @default("PENDING")
+  requestedAt       DateTime  @default(now()) @map("requested_at")
+  approvedAt        DateTime? @map("approved_at")
+  rejectedAt        DateTime? @map("rejected_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_requests")
 }
@@ -78,12 +73,12 @@ model User {
   roleId    Int        @map("role_id")
   role      Role       @relation(fields: [roleId], references: [id])
   status    UserStatus @default(ACTIVE)
+  region    Region?
   lastLogin DateTime?  @map("last_login")
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
   
   resetRequests PasswordResetRequest[]
-  adminApprovals PasswordResetRequest[] @relation("AdminApprovals")
 
   @@map("users")
 }
@@ -242,8 +237,21 @@ model PromotionDesign {
   @@map("promotion_designs")
 }
 
+enum CustomerType {
+  RETAIL    @map("Retail")
+  WHOLESALE @map("Wholesale")
+}
 
+model Customer {
+  id        Int          @id @default(autoincrement())
+  name      String
+  email     String       @unique
+  phone     String
+  region    Region
+  type      CustomerType
+  address   String?
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
 
-
-
-
+  @@map("customers")
+}

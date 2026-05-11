@@ -24,8 +24,10 @@ export function ForgotPasswordPage() {
     setIsLoading(true);
     try {
       await authService.forgotPassword(formData.email, formData.newPassword);
-      toast.success("Password reset request sent to Admin");
-      setTimeout(() => navigate("/login"), 2000);
+      toast.success("Success! Your password reset request has been sent to the Admin for approval.");
+      setTimeout(() => navigate("/login", { 
+        state: { infoMessage: "Your password reset request is pending. You can continue using your old password until the Admin approves your request." } 
+      }), 3000);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to send request");
     } finally {

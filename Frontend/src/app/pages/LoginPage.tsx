@@ -1,29 +1,49 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useLocation } from "react-router";
 import { Lock, User } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
+import { authService } from "../../services/auth.service";
+import { toast } from "sonner";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
-    userId: "",
+    email: "",
     password: "",
   });
 
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.infoMessage) {
+      toast.info(location.state.infoMessage, {
+        duration: 6000,
+      });
+      // Clear the state so the message doesn't persist on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setIsLoading(true);
 
     try {
-      await authService.login(formData.userId, formData.password);
+      const data = await authService.login(formData.email, formData.password);
+      toast.success("Login successful!");
       navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid credentials");
+      let message = err.response?.data?.message || "Invalid credentials";
+      
+      // If it's a generic invalid credentials error, add a helpful hint
+      if (message === "Invalid email or password") {
+        message = "Invalid email or password. Please try again or use 'Forgot Password?' to request a reset.";
+      }
+      
+      toast.error(message, {
+        duration: 5000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -41,11 +61,6 @@ export function LoginPage() {
             <p className="text-gray-600">Sign in to your CRM account</p>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm text-center">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -55,11 +70,11 @@ export function LoginPage() {
               <div className="relative">
                 <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={formData.userId}
-                  onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                  placeholder="Enter your user ID or email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Enter your email"
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

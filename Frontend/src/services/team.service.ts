@@ -5,7 +5,7 @@ export interface TeamMember {
   firstName: string;
   lastName: string;
   email: string;
-  region: 'North' | 'South' | 'East' | 'West';
+  region: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST';
   status: 'ACTIVE' | 'INACTIVE';
   role: {
     id: number;
@@ -14,16 +14,10 @@ export interface TeamMember {
   createdAt: string;
 }
 
-export interface Role {
-  id: number;
-  name: string;
-  description: string;
-}
-
 export interface CreateTeamMemberDto {
   fullName: string;
   email: string;
-  roleId: number;
+  role: string;
   region: string;
 }
 
@@ -32,29 +26,15 @@ export interface UpdateTeamMemberDto extends Partial<CreateTeamMemberDto> {
 }
 
 export const teamService = {
-  getAll: async (searchQuery?: string) => {
-    const response = await api.get<TeamMember[]>("/team", {
-      params: { search: searchQuery },
-    });
-    return response.data;
-  },
-
-  getRoles: async () => {
-    const response = await api.get<Role[]>("/roles");
-    return response.data;
-  },
-
-  create: async (data: CreateTeamMemberDto) => {
-    const response = await api.post<TeamMember>("/team", data);
-    return response.data;
-  },
-
-  update: async (id: number, data: UpdateTeamMemberDto) => {
-    const response = await api.patch<TeamMember>(`/team/${id}`, data);
-    return response.data;
-  },
-
-  delete: async (id: number) => {
-    await api.delete(`/team/${id}`);
-  },
+  getAll: (searchQuery?: string) =>
+    api.get<TeamMember[]>("/team", { params: { search: searchQuery } }).then((r) => r.data),
+  
+  create: (data: CreateTeamMemberDto) =>
+    api.post<TeamMember>("/team", data).then((r) => r.data),
+  
+  update: (id: number, data: UpdateTeamMemberDto) =>
+    api.put<TeamMember>(`/team/${id}`, data).then((r) => r.data),
+  
+  delete: (id: number) =>
+    api.delete(`/team/${id}`).then((r) => r.data),
 };

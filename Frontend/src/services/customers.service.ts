@@ -6,10 +6,9 @@ export interface Customer {
   email: string;
   phone: string;
   region: 'North' | 'South' | 'East' | 'West';
-  customerType: 'Retail' | 'Wholesale';
+  type: 'Retail' | 'Wholesale';
   address?: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreateCustomerDto {
@@ -17,31 +16,22 @@ export interface CreateCustomerDto {
   email: string;
   phone: string;
   region: string;
-  customerType: string;
+  type: string;
   address?: string;
 }
 
 export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
 
 export const customersService = {
-  getAll: async (searchQuery?: string) => {
-    const response = await api.get<Customer[]>("/customers", {
-      params: { search: searchQuery },
-    });
-    return response.data;
-  },
-
-  create: async (data: CreateCustomerDto) => {
-    const response = await api.post<Customer>("/customers", data);
-    return response.data;
-  },
-
-  update: async (id: number, data: UpdateCustomerDto) => {
-    const response = await api.patch<Customer>(`/customers/${id}`, data);
-    return response.data;
-  },
-
-  delete: async (id: number) => {
-    await api.delete(`/customers/${id}`);
-  },
+  getAll: (searchQuery?: string) =>
+    api.get<Customer[]>("/customers", { params: { search: searchQuery } }).then((r) => r.data),
+  
+  create: (data: CreateCustomerDto) =>
+    api.post<Customer>("/customers", data).then((r) => r.data),
+  
+  update: (id: number, data: UpdateCustomerDto) =>
+    api.put<Customer>(`/customers/${id}`, data).then((r) => r.data),
+  
+  delete: (id: number) =>
+    api.delete(`/customers/${id}`).then((r) => r.data),
 };
