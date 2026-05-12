@@ -255,3 +255,26 @@ model Customer {
 
   @@map("customers")
 }
+
+model MasterConfig {
+  id         Int          @id @default(autoincrement())
+  name       String       @unique
+  slug       String       @unique
+  config     Json         // Array of { label, key, dataType, validationRules, options }
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  records    MasterData[]
+
+  @@map("master_configs")
+}
+
+model MasterData {
+  id             Int          @id @default(autoincrement())
+  masterConfigId Int          @map("master_config_id")
+  masterConfig   MasterConfig @relation(fields: [masterConfigId], references: [id])
+  data           Json         // Actual record data
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("master_data")
+}

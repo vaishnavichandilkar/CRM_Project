@@ -68,3 +68,31 @@ export const shgService = {
   update: (id: number, data: any) => api.put<SHG>(`/shg/${id}`, data).then(r => r.data),
   delete: (id: number) => api.delete(`/shg/${id}`).then(r => r.data),
 };
+
+// Dynamic Masters Service
+export interface MasterConfig {
+  id: number;
+  name: string;
+  slug: string;
+  config: any[];
+}
+
+export interface MasterRecord {
+  id: number;
+  [key: string]: any;
+}
+
+export const dynamicMastersService = {
+  getAllConfigs: () => api.get<MasterConfig[]>("/masters/configs").then(r => r.data),
+  getConfig: (slug: string) => api.get<MasterConfig>(`/masters/config/${slug}`).then(r => r.data),
+  createConfig: (data: any) => api.post<MasterConfig>("/masters/config", data).then(r => r.data),
+  updateConfig: (slug: string, data: any) => api.put<MasterConfig>(`/masters/config/${slug}`, data).then(r => r.data),
+  deleteConfig: (slug: string) => api.delete(`/masters/config/${slug}`).then(r => r.data),
+  getRecords: (slug: string, params?: { search?: string; page?: number; limit?: number }) => 
+    api.get<{ records: MasterRecord[]; total: number }> (`/masters/records/${slug}`, { params }).then(r => r.data),
+
+  createRecord: (slug: string, data: any) => api.post<MasterRecord>(`/masters/record/${slug}`, data).then(r => r.data),
+  updateRecord: (id: number, data: any) => api.put<MasterRecord>(`/masters/record/${id}`, data).then(r => r.data),
+  deleteRecord: (id: number) => api.delete(`/masters/record/${id}`).then(r => r.data),
+};
+

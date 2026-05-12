@@ -9,12 +9,28 @@ import {
 import { Modal, ModalFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { authService } from "../../../services/auth.service";
+import { dynamicMastersService, MasterConfig } from "../../../services/masters.service";
+
+// Map slugs to icons for the sidebar
+const iconMap: Record<string, any> = {
+  'products': Package,
+  'customers': UserCircle,
+  'team': Users,
+  'dealers': Award,
+  'suppliers': Briefcase,
+  'transporters': Truck,
+  'vet-docs': FileText,
+  'shg': Users,
+  'content-plans': Megaphone,
+  'promotion-designs': Image,
+};
 
 export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mastersOpen, setMastersOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [dynamicMasters, setDynamicMasters] = useState<MasterConfig[]>([]);
   const navigate = useNavigate();
   
   const user = authService.getCurrentUser();
@@ -22,6 +38,10 @@ export function MainLayout() {
   useEffect(() => {
     if (!authService.isAuthenticated()) {
       navigate("/login");
+    } else {
+      dynamicMastersService.getAllConfigs()
+        .then(setDynamicMasters)
+        .catch(console.error);
     }
   }, [navigate]);
 
@@ -66,16 +86,14 @@ export function MainLayout() {
             </button>
             {mastersOpen && (
               <div className="ml-8 mt-1 space-y-1">
-                <SubNavItem to="/masters/products" icon={Package} label="Products" />
-                <SubNavItem to="/masters/customers" icon={UserCircle} label="Customers" />
-                <SubNavItem to="/masters/team" icon={Users} label="Team" />
-                <SubNavItem to="/masters/dealers" icon={Award} label="Dealers" />
-                <SubNavItem to="/masters/suppliers" icon={Briefcase} label="Suppliers" />
-                <SubNavItem to="/masters/transporters" icon={Truck} label="Transporters" />
-                <SubNavItem to="/masters/vet-docs" icon={FileText} label="Vet Docs" />
-                <SubNavItem to="/masters/shg" icon={Users} label="SHG" />
-                <SubNavItem to="/masters/content-plans" icon={Megaphone} label="Content Plans" />
-                <SubNavItem to="/masters/promotion-designs" icon={Image} label="Promotion Designs" />
+                {dynamicMasters.map((m) => (
+                  <SubNavItem 
+                    key={m.slug} 
+                    to={`/masters/${m.slug}`} 
+                    icon={iconMap[m.slug] || Database} 
+                    label={m.name} 
+                  />
+                ))}
               </div>
             )}
           </div>
