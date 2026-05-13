@@ -32,7 +32,15 @@ export function LoginPage() {
     try {
       const data = await authService.login(formData.email, formData.password);
       toast.success("Login successful!");
-      navigate("/");
+      
+      if (!data.user.hasModulePreferences) {
+        navigate("/module-selection");
+      } else {
+        // Also ensure they are stored in localStorage for the sidebar
+        // This might require a fetch if not in the login response, 
+        // but for now let's just go to dashboard and let the sidebar handle it.
+        navigate("/");
+      }
     } catch (err: any) {
       let message = err.response?.data?.message || "Invalid credentials";
       

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router";
 import {
   LayoutDashboard, Users, ShoppingCart, MapPin, BarChart3,
   Database, Menu, X, Search, Bell, User, LogOut, ChevronDown,
@@ -10,6 +10,7 @@ import { Modal, ModalFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { authService } from "../../../services/auth.service";
 import { dynamicMastersService, MasterConfig } from "../../../services/masters.service";
+import api from "../../../services/api";
 
 // Map slugs to icons for the sidebar
 const iconMap: Record<string, any> = {
@@ -32,8 +33,37 @@ export function MainLayout() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [dynamicMasters, setDynamicMasters] = useState<MasterConfig[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
   
   const user = authService.getCurrentUser();
+
+  const [selectedModules, setSelectedModules] = useState<string[] | null>(() => {
+    const saved = localStorage.getItem("crm_selected_modules");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (selectedModules) {
+      const path = location.pathname;
+      const pathToKey: Record<string, string> = {
+        '/': 'dashboard',
+        '/leads': 'leads',
+        '/sales': 'sales',
+        '/visits': 'visits',
+        '/reports': 'reports',
+        '/users': 'users',
+      };
+      
+      let key = pathToKey[path];
+      if (!key && path.startsWith('/masters/')) {
+        key = path.split('/')[2];
+      }
+      
+      if (key && !selectedModules.includes(key)) {
+        navigate("/");
+      }
+    }
+  }, [location.pathname, selectedModules, navigate]);
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
@@ -42,11 +72,30 @@ export function MainLayout() {
       dynamicMastersService.getAllConfigs()
         .then(setDynamicMasters)
         .catch(console.error);
+
+      // If not in localStorage, try to fetch from API
+      if (!selectedModules) {
+        api.get("/user-module-preferences")
+          .then(res => {
+            if (res.data?.selectedModules) {
+              const modules = res.data.selectedModules;
+              localStorage.setItem("crm_selected_modules", JSON.stringify(modules));
+              setSelectedModules(modules);
+            }
+          })
+          .catch(console.error);
+      }
     }
-  }, [navigate]);
+  }, [navigate, selectedModules]);
+
+  const isSelected = (key: string) => {
+    if (!selectedModules) return true; // Show all while loading
+    return selectedModules.includes(key);
+  };
 
   const handleLogout = () => {
     authService.logout();
+    localStorage.removeItem("crm_selected_modules"); // Clear preferences on logout
     setShowLogoutModal(false);
     navigate("/login");
   };
@@ -64,41 +113,45 @@ export function MainLayout() {
         </div>
 
         <nav className="flex-1 p-4 overflow-y-auto">
-          <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem to="/leads" icon={Users} label="Leads & Enquiries" />
-          <NavItem to="/sales" icon={ShoppingCart} label="Sales" />
-          <NavItem to="/visits" icon={MapPin} label="Visits" />
-          <NavItem to="/reports" icon={BarChart3} label="Reports" />
+          {isSelected("dashboard") && <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />}
+          {isSelected("leads") && <NavItem to="/leads" icon={Users} label="Leads & Enquiries" />}
+          {isSelected("sales") && <NavItem to="/sales" icon={ShoppingCart} label="Sales" />}
+          {isSelected("visits") && <NavItem to="/visits" icon={MapPin} label="Visits" />}
+          {isSelected("reports") && <NavItem to="/reports" icon={BarChart3} label="Reports" />}
 
           {/* Masters Dropdown */}
-          <div className="mt-2">
-            <button
-              onClick={() => setMastersOpen(!mastersOpen)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <Database className="w-5 h-5" />
-              <span className="flex-1 text-left">Masters</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${
-                  mastersOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-            {mastersOpen && (
-              <div className="ml-8 mt-1 space-y-1">
-                {dynamicMasters.map((m) => (
-                  <SubNavItem 
-                    key={m.slug} 
-                    to={`/masters/${m.slug}`} 
-                    icon={iconMap[m.slug] || Database} 
-                    label={m.name} 
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {dynamicMasters.some(m => isSelected(m.slug)) && (
+            <div className="mt-2">
+              <button
+                onClick={() => setMastersOpen(!mastersOpen)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <Database className="w-5 h-5" />
+                <span className="flex-1 text-left">Masters</span>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform ${
+                    mastersOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {mastersOpen && (
+                <div className="ml-8 mt-1 space-y-1">
+                  {dynamicMasters
+                    .filter(m => isSelected(m.slug))
+                    .map((m) => (
+                      <SubNavItem 
+                        key={m.slug} 
+                        to={`/masters/${m.slug}`} 
+                        icon={iconMap[m.slug] || Database} 
+                        label={m.name} 
+                      />
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
-          <NavItem to="/users" icon={User} label="Users & Roles" />
+          {isSelected("users") && <NavItem to="/users" icon={User} label="Users & Roles" />}
         </nav>
 
         <div className="p-4 border-t border-gray-200">

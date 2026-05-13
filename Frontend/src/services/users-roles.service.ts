@@ -32,6 +32,7 @@ export interface User {
   status: 'ACTIVE' | 'INACTIVE';
   role: Role;
   lastLogin?: string;
+  hasModulePreferences?: boolean;
   createdAt: string;
 }
 

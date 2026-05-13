@@ -55,6 +55,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
       include: { 
+        modulePreferences: true,
         role: {
           include: {
             permissions: {
@@ -112,6 +113,7 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         status: user.status,
+        hasModulePreferences: !!user.modulePreferences,
       },
     };
   }

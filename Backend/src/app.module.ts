@@ -18,6 +18,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { MastersModule } from './modules/masters/masters.module';
+import { AppsModule } from './modules/apps/apps.module';
+import { AppStoreModule } from './modules/app-store/app-store.module';
+import { UserPreferencesModule } from './modules/user-preferences/user-preferences.module';
+import { UserModulePreferencesModule } from './modules/user-module-preferences/user-module-preferences.module';
 
 @Module({
   imports: [
@@ -39,6 +43,10 @@ import { MastersModule } from './modules/masters/masters.module';
     CustomersModule,
     TeamModule,
     MastersModule,
+    AppsModule,
+    AppStoreModule,
+    UserPreferencesModule,
+    UserModulePreferencesModule,
   ],
   controllers: [],
   providers: [

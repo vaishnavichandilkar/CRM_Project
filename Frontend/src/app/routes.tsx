@@ -10,6 +10,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DynamicMasterPage } from "./pages/masters/DynamicMasterPage";
+import { ModuleSelection } from "./pages/ModuleSelection";
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,10 @@ export const router = createBrowserRouter([
   {
     path: "/forgot-password",
     Component: ForgotPasswordPage,
+  },
+  {
+    path: "/module-selection",
+    Component: ModuleSelection,
   },
   {
     path: "/",
