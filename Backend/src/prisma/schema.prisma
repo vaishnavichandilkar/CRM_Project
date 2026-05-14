@@ -80,9 +80,53 @@ model User {
   
   resetRequests PasswordResetRequest[]
   modulePreferences UserModulePreference?
+  customModules     CustomModule[]
 
   @@map("users")
 }
+
+model CustomModule {
+  id          Int                @id @default(autoincrement())
+  name        String
+  icon        String
+  description String?
+  allowView   Boolean            @default(true) @map("allow_view")
+  allowEdit   Boolean            @default(true) @map("allow_edit")
+  allowDelete Boolean            @default(true) @map("allow_delete")
+  userId      Int                @map("user_id")
+  user        User               @relation(fields: [userId], references: [id])
+  fields      CustomField[]
+  records     CustomModuleData[]
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@map("custom_modules")
+}
+
+model CustomField {
+  id             Int          @id @default(autoincrement())
+  customModuleId Int          @map("custom_module_id")
+  customModule   CustomModule @relation(fields: [customModuleId], references: [id], onDelete: Cascade)
+  name           String
+  dataType       String       // e.g., "string", "number", "date"
+  validationRules Json?        // e.g., { required: true, min: 0 }
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("custom_fields")
+}
+
+model CustomModuleData {
+  id             Int          @id @default(autoincrement())
+  customModuleId Int          @map("custom_module_id")
+  customModule   CustomModule @relation(fields: [customModuleId], references: [id], onDelete: Cascade)
+  data           Json         // The actual record data
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("custom_module_data")
+}
+
 
 enum ProductStatus {
   ACTIVE       @map("Active")
