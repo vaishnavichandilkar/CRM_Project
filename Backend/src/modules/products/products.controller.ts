@@ -33,6 +33,12 @@ export class ProductsController {
     return this.productsService.findAll(search);
   }
 
+  @Get('dropdown')
+  @ApiOperation({ summary: 'Get products for dropdown selection' })
+  getDropdown() {
+    return this.productsService.getDropdown();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Fetch a single product' })
   findOne(@Param('id', ParseIntPipe) id: number) {

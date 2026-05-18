@@ -36,7 +36,47 @@ export class CustomersService {
     });
   }
 
+  async getDropdown() {
+    const records = await this.prisma.masterData.findMany({
+      where: {
+        masterConfig: {
+          slug: 'customers',
+        },
+      },
+      select: {
+        id: true,
+        data: true,
+      },
+    });
+
+    return records.map((r) => {
+      const data = r.data as any;
+      return {
+        id: r.id,
+        customerCode: data.customerCode || `CUST${String(r.id).padStart(3, '0')}`,
+        name: data.name || '',
+        phone: data.phone || '',
+      };
+    });
+  }
+
   async findOne(id: number) {
+    const record = await this.prisma.masterData.findFirst({
+      where: {
+        id,
+        masterConfig: {
+          slug: 'customers',
+        },
+      },
+    });
+
+    if (record) {
+      return {
+        id: record.id,
+        ...(record.data as object),
+      };
+    }
+
     const customer = await this.prisma.customer.findUnique({
       where: { id },
     });

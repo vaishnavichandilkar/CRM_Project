@@ -1,16 +1,24 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { leadsService, Lead, CreateLeadDto } from '../../../services/leads.service';
+import { leadsService, Lead, CreateLeadDto, LeadStats } from '../../services/leadService';
+import { toast } from 'sonner';
 
 interface LeadState {
   leadsList: Lead[];
-  availableSalesReps: { id: number; name: string }[];
+  stats: LeadStats;
+  eligibleStaff: { id: number; firstName: string; lastName: string }[];
   loading: boolean;
   error: string | null;
 }
 
 const initialState: LeadState = {
   leadsList: [],
-  availableSalesReps: [],
+  stats: {
+    Open: 0,
+    'In Progress': 0,
+    Won: 0,
+    Lost: 0,
+  },
+  eligibleStaff: [],
   loading: false,
   error: null,
 };
@@ -19,21 +27,42 @@ export const fetchLeads = createAsyncThunk('leads/fetchAll', async () => {
   return await leadsService.getAllLeads();
 });
 
-export const fetchSalesReps = createAsyncThunk('leads/fetchSalesReps', async () => {
-  return await leadsService.getSalesReps();
+export const fetchLeadStats = createAsyncThunk('leads/fetchStats', async () => {
+  return await leadsService.getStats();
 });
 
-export const createNewLead = createAsyncThunk('leads/create', async (data: CreateLeadDto, { dispatch }) => {
-  const result = await leadsService.createLead(data);
-  dispatch(fetchLeads()); // Re-fetch to update table and stats
-  return result;
+export const fetchEligibleStaff = createAsyncThunk('leads/fetchStaff', async () => {
+  return await leadsService.getEligibleStaff();
 });
 
-export const updateExistingLead = createAsyncThunk(
-  'leads/update',
-  async ({ id, data }: { id: number; data: any }, { dispatch }) => {
-    const result = await leadsService.updateLead(id, data);
+export const createNewLead = createAsyncThunk(
+  'leads/create', 
+  async (data: CreateLeadDto, { dispatch }) => {
+    const result = await leadsService.createLead(data);
+    toast.success('Lead created successfully');
     dispatch(fetchLeads());
+    dispatch(fetchLeadStats());
+    return result;
+  }
+);
+
+export const scheduleNewCall = createAsyncThunk(
+  'leads/scheduleCall',
+  async (data: any, { dispatch }) => {
+    const result = await leadsService.scheduleCall(data);
+    toast.success('Call scheduled successfully');
+    dispatch(fetchLeads()); 
+    return result;
+  }
+);
+
+export const updateLeadStatus = createAsyncThunk(
+  'leads/updateStatus',
+  async ({ id, status }: { id: number; status: any }, { dispatch }) => {
+    const result = await leadsService.updateLeadStatus(id, status);
+    toast.success('Status updated');
+    dispatch(fetchLeads());
+    dispatch(fetchLeadStats());
     return result;
   }
 );
@@ -55,8 +84,11 @@ const leadSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || 'Failed to fetch leads';
       })
-      .addCase(fetchSalesReps.fulfilled, (state, action) => {
-        state.availableSalesReps = action.payload;
+      .addCase(fetchLeadStats.fulfilled, (state, action) => {
+        state.stats = action.payload;
+      })
+      .addCase(fetchEligibleStaff.fulfilled, (state, action) => {
+        state.eligibleStaff = action.payload;
       });
   },
 });

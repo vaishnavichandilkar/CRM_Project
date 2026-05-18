@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
 const api = axios.create({
   baseURL: 'http://localhost:5000',
@@ -16,19 +17,32 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor to handle authentication errors
+// Add response interceptor to handle authentication and global errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const message = error.response?.data?.message || 'An unexpected error occurred';
+    
     if (error.response?.status === 401) {
-      // Only redirect if NOT already on login page and NOT a login attempt
       const isAuthPath = error.config.url?.includes('/auth/signin') || error.config.url?.includes('/auth/signup');
       if (!isAuthPath && window.location.pathname !== '/login') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+    } else if (error.response?.status === 409) {
+      toast.error(message); // Conflict error (e.g., overlapping calls)
+    } else if (error.response?.status === 400) {
+      // Handle validation errors (array or string)
+      if (Array.isArray(message)) {
+        message.forEach(msg => toast.error(msg));
+      } else {
+        toast.error(message);
+      }
+    } else {
+      toast.error(message);
     }
+    
     return Promise.reject(error);
   }
 );

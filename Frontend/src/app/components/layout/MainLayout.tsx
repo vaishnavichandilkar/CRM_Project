@@ -4,12 +4,20 @@ import {
   LayoutDashboard, Users, ShoppingCart, MapPin, BarChart3,
   Database, Menu, X, Search, Bell, User, LogOut, ChevronDown,
   Package, UserCircle, Award, Truck, FileText, Briefcase, Megaphone, Image,
-  AlertCircle
+  AlertCircle, Settings, Table, List
 } from "lucide-react";
 import { Modal, ModalFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { authService } from "../../../services/auth.service";
 import { dynamicMastersService, MasterConfig } from "../../../services/masters.service";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import api from "../../../services/api";
 
 // Map slugs to icons for the sidebar
@@ -32,6 +40,7 @@ export function MainLayout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [dynamicMasters, setDynamicMasters] = useState<MasterConfig[]>([]);
+  const [customModules, setCustomModules] = useState<any[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -73,6 +82,11 @@ export function MainLayout() {
         .then(setDynamicMasters)
         .catch(console.error);
 
+      // Fetch custom modules
+      api.get("/custom-modules")
+        .then(res => setCustomModules(res.data))
+        .catch(console.error);
+
       // If not in localStorage, try to fetch from API
       if (!selectedModules) {
         api.get("/user-module-preferences")
@@ -98,6 +112,10 @@ export function MainLayout() {
     localStorage.removeItem("crm_selected_modules"); // Clear preferences on logout
     setShowLogoutModal(false);
     navigate("/login");
+  };
+
+  const ICON_MAP: Record<string, any> = {
+    LayoutDashboard, Database, Table, List, Settings
   };
 
   return (
@@ -152,9 +170,35 @@ export function MainLayout() {
           )}
 
           {isSelected("users") && <NavItem to="/users" icon={User} label="Users & Roles" />}
+
+          {/* Custom Modules Section */}
+          {customModules.some(m => isSelected(`custom-${m.id}`)) && (
+            <div className="mt-6 mb-2">
+              <h3 className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Custom Modules</h3>
+              <div className="mt-1 space-y-1">
+                {customModules
+                  .filter(m => isSelected(`custom-${m.id}`))
+                  .map(m => (
+                    <NavItem 
+                      key={m.id} 
+                      to={`/custom/${m.id}`} 
+                      icon={ICON_MAP[m.icon] || Database} 
+                      label={m.name} 
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
         </nav>
 
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          <button
+            onClick={() => navigate("/module-selection")}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Customize Workspace</span>
+          </button>
           <button
             onClick={() => setShowLogoutModal(true)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
@@ -225,15 +269,47 @@ export function MainLayout() {
             </div>
 
             {/* User Profile */}
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <div className="font-medium text-sm">{user ? `${user.firstName} ${user.lastName}` : "User"}</div>
-                <div className="text-xs text-gray-500">{user?.role?.name || "Guest"}</div>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 pl-4 border-l border-gray-200 outline-none hover:bg-gray-50 py-1 px-2 rounded-lg transition-colors group">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-700 transition-colors">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="text-left hidden md:block">
+                    <div className="font-medium text-sm">{user ? `${user.firstName} ${user.lastName}` : "User"}</div>
+                    <div className="text-xs text-gray-500">{user?.role?.name || "Guest"}</div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user ? `${user.firstName} ${user.lastName}` : "User"}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.email || "user@example.com"}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  <span>Profile Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/module-selection")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Customize Workspace</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50" 
+                  onClick={() => setShowLogoutModal(true)}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

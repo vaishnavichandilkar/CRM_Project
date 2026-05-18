@@ -10,6 +10,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DynamicMasterPage } from "./pages/masters/DynamicMasterPage";
+import { CustomModuleDataPage } from "./pages/CustomModuleDataPage";
 import { ModuleSelection } from "./pages/ModuleSelection";
 
 export const router = createBrowserRouter([
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
 
       // All Masters routes are now dynamic
       { path: "masters/:slug", Component: DynamicMasterPage },
+      { path: "custom/:id", Component: CustomModuleDataPage },
     ],
   },
 ]);

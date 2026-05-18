@@ -23,6 +23,7 @@ import { AppStoreModule } from './modules/app-store/app-store.module';
 import { UserPreferencesModule } from './modules/user-preferences/user-preferences.module';
 import { UserModulePreferencesModule } from './modules/user-module-preferences/user-module-preferences.module';
 import { CustomModulesModule } from './modules/custom-modules/custom-modules.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { CustomModulesModule } from './modules/custom-modules/custom-modules.mod
     UserPreferencesModule,
     UserModulePreferencesModule,
     CustomModulesModule,
+    LeadsModule,
   ],
   controllers: [],
   providers: [

@@ -59,7 +59,46 @@ export class ProductsService {
     });
   }
 
+  async getDropdown() {
+    const records = await this.prisma.masterData.findMany({
+      where: {
+        masterConfig: {
+          slug: 'products',
+        },
+      },
+      select: {
+        id: true,
+        data: true,
+      },
+    });
+
+    return records.map((r) => {
+      const data = r.data as any;
+      return {
+        id: r.id,
+        sku: data.sku || `PRD${String(r.id).padStart(3, '0')}`,
+        name: data.name || '',
+      };
+    });
+  }
+
   async findOne(id: number) {
+    const record = await this.prisma.masterData.findFirst({
+      where: {
+        id,
+        masterConfig: {
+          slug: 'products',
+        },
+      },
+    });
+
+    if (record) {
+      return {
+        id: record.id,
+        ...(record.data as object),
+      };
+    }
+
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
@@ -80,7 +119,7 @@ export class ProductsService {
   }
 
   async update(id: number, dto: UpdateProductDto) {
-    const currentProduct = await this.findOne(id);
+    const currentProduct = (await this.findOne(id)) as any;
 
     // SKU conflict check if SKU is being updated
     if (dto.sku && dto.sku !== currentProduct.sku) {

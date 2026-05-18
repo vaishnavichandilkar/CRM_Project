@@ -21,6 +21,12 @@ export class CustomersController {
     return this.customersService.findAll(search);
   }
 
+  @Get('dropdown')
+  @ApiOperation({ summary: 'Get customers for dropdown selection' })
+  getDropdown() {
+    return this.customersService.getDropdown();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a customer by id' })
   findOne(@Param('id', ParseIntPipe) id: number) {

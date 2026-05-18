@@ -78,11 +78,164 @@ model User {
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
   
-  resetRequests PasswordResetRequest[]
+  resetRequests     PasswordResetRequest[]
   modulePreferences UserModulePreference?
   customModules     CustomModule[]
+  assignedLeads     Lead[]           @relation("AssignedLeads")
+  calls             Call[]
+  leadHistoryChanges LeadHistory[]
 
   @@map("users")
+}
+
+enum LeadSource {
+  META_ADS    @map("Meta Ads")
+  GOOGLE_ADS  @map("Google Ads")
+  REFERRAL    @map("Referral")
+  WEBSITE     @map("Website")
+  OTHER       @map("Other")
+}
+
+enum LeadStatus {
+  OPEN        @map("Open")
+  IN_PROGRESS @map("In Progress")
+  WON         @map("Won")
+  LOST        @map("Lost")
+}
+
+model Lead {
+  id           Int           @id @default(autoincrement())
+  leadNumber   String?       @map("lead_number")
+  customerId   Int?          @map("customer_id")
+  customer     MasterData?   @relation("LeadCustomer", fields: [customerId], references: [id])
+  productId    Int?          @map("product_id")
+  product      MasterData?   @relation("LeadProduct", fields: [productId], references: [id])
+  assignedToId Int?          @map("assigned_to_id")
+  assignedTo   User?         @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  status       LeadStatus    @default(OPEN)
+  source       LeadSource    @default(OTHER)
+  notes        String?
+  isConverted  Boolean       @default(false) @map("is_converted")
+
+  // Customer Details (Autofilled & Editable)
+  customerName    String?    @map("customer_name")
+  mobileNumber    String?    @map("mobile_number")
+  alternateMobile String?    @map("alternate_mobile")
+  email           String?
+  gstNumber       String?    @map("gst_number")
+  companyName     String?    @map("company_name")
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  pincode         String?
+  customerType    String?    @map("customer_type")
+  contactPerson   String?    @map("contact_person")
+  customerData    Json?      @map("customer_data")
+
+  // Product Details (Autofilled & Editable)
+  productName     String?    @map("product_name")
+  productCode     String?    @map("product_code")
+  category        String?
+  brand           String?
+  unit            String?
+  price           Float?
+  tax             Float?
+  stockQuantity   Int?       @map("stock_quantity")
+  description     String?
+  productData     Json?      @map("product_data")
+  
+  // Custom Lead Data (for dynamically managed Lead columns)
+  leadData        Json?      @map("lead_data")
+
+  tasks           Task[]
+  calls           Call[]
+  followups       LeadFollowup[]
+  history         LeadHistory[]
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("leads")
+}
+
+enum TaskPriority {
+  LOW      @map("Low")
+  MEDIUM   @map("Medium")
+  HIGH     @map("High")
+  CRITICAL @map("Critical")
+}
+
+enum TaskStatus {
+  TODO        @map("To Do")
+  IN_PROGRESS @map("In Progress")
+  COMPLETED   @map("Completed")
+}
+
+model Task {
+  id          Int          @id @default(autoincrement())
+  subject     String
+  dueDate     DateTime     @map("due_date")
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  description String?
+  leadId      Int          @map("lead_id")
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("tasks")
+}
+
+enum CallType {
+  INBOUND  @map("Inbound")
+  OUTBOUND @map("Outbound")
+}
+
+model Call {
+  id                Int       @id @default(autoincrement())
+  callType          CallType  @map("call_type")
+  startTime         DateTime  @map("start_time")
+  duration          Int?      // in seconds
+  voiceRecordingUrl String?   @map("voice_recording_url")
+  notes             String?
+  leadId            Int       @map("lead_id")
+  lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  ownerId           Int       @map("owner_id")
+  owner             User      @relation(fields: [ownerId], references: [id])
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("calls")
+}
+
+model LeadHistory {
+  id          Int        @id @default(autoincrement())
+  leadId      Int        @map("lead_id")
+  lead        Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  oldStatus   LeadStatus @map("old_status")
+  newStatus   LeadStatus @map("new_status")
+  changedById Int        @map("changed_by_id")
+  changedBy   User       @relation(fields: [changedById], references: [id])
+  remarks     String?    @map("remarks")
+  timestamp   DateTime   @default(now()) @map("timestamp")
+
+  @@map("lead_histories")
+}
+
+model LeadFollowup {
+  id               Int          @id @default(autoincrement())
+  leadId           Int          @map("lead_id")
+  lead             Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  callDate         DateTime     @map("call_date")
+  callTime         String       @map("call_time")
+  callType         String       @map("call_type") // Incoming, Outgoing, Meeting, Demo
+  conversation     String
+  nextFollowupDate DateTime?    @map("next_followup_date")
+  status           String       @default("PENDING")
+  assignedEmployee String?      @map("assigned_employee")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@map("lead_followups")
 }
 
 model CustomModule {
@@ -320,6 +473,9 @@ model MasterData {
   data           Json         // Actual record data
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  leadsAsCustomer Lead[] @relation("LeadCustomer")
+  leadsAsProduct  Lead[] @relation("LeadProduct")
 
   @@map("master_data")
 }

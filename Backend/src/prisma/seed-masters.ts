@@ -37,7 +37,7 @@ async function main() {
           validationRules: { required: true } 
         },
         { 
-          label: 'Type', 
+          label: 'Customer Type', 
           key: 'type', 
           dataType: 'dropdown', 
           options: ['Retail', 'Wholesale'],
