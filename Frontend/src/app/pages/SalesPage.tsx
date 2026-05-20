@@ -7,12 +7,15 @@ import { Badge } from "../components/ui/Badge";
 import { Modal, ModalFooter } from "../components/ui/Modal";
 import { Input, Select } from "../components/ui/Input";
 import { leadsService } from "../services/leadService";
+import { salesService } from "../../services/sales.service";
 
 export function SalesPage() {
   const [activeTab, setActiveTab] = useState<"fresh" | "resale">("fresh");
   const [salesList, setSalesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     customer: "",
     product: "",
@@ -23,6 +26,11 @@ export function SalesPage() {
   const fetchSales = async () => {
     try {
       setLoading(true);
+      const custData = await leadsService.getCustomersDropdown();
+      setCustomers(custData);
+      const prodData = await leadsService.getProductsDropdown();
+      setProducts(prodData);
+      
       const leads = await leadsService.getAllLeads();
       const wonLeads = leads.filter((l: any) => l.isConverted === true || l.status === 'WON' || l.status === 'Won');
       
@@ -61,7 +69,19 @@ export function SalesPage() {
         }
       ];
 
-      setSalesList([...mapped, ...mockResale]);
+      const backendSales = await salesService.getSalesData();
+      const mappedBackendSales = backendSales.map((s: any) => ({
+        id: s.id,
+        customer: s.customer?.name || "Unnamed Customer",
+        product: s.product?.name || "Product",
+        amount: s.amount,
+        status: s.status,
+        type: s.purchaseCount > 1 ? "Resale" : "Fresh",
+        date: new Date(s.createdAt).toISOString().split('T')[0],
+        resaleCount: s.purchaseCount > 1 ? s.purchaseCount : 0,
+      }));
+
+      setSalesList([...mapped, ...mockResale, ...mappedBackendSales]);
     } catch (err) {
       console.error("Error loading sales pipeline", err);
     } finally {
@@ -73,21 +93,36 @@ export function SalesPage() {
     fetchSales();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Allow manually adding new sales record if needed
-    const newSale = {
-      id: Date.now(),
-      customer: formData.customer,
-      product: formData.product,
-      amount: parseFloat(formData.amount) || 0,
-      status: formData.status,
-      type: activeTab === "fresh" ? "Fresh" : "Resale",
-      date: new Date().toISOString().split('T')[0],
-      resaleCount: activeTab === "resale" ? 1 : 0,
-    };
-    setSalesList(prev => [newSale, ...prev]);
-    setIsModalOpen(false);
+    try {
+      const customerId = customers.find(c => c.name === formData.customer)?.id || 0;
+      const productId = products.find(p => p.name === formData.product)?.id || 0;
+
+      if (!customerId || !productId) {
+        alert("Please select a valid customer and product.");
+        return;
+      }
+
+      await salesService.createSale({
+        amount: parseFloat(formData.amount) || 0,
+        status: formData.status as any,
+        customerId,
+        productId,
+        purchaseCount: activeTab === "resale" ? 2 : 1,
+      });
+
+      setIsModalOpen(false);
+      setFormData({
+        customer: "",
+        product: "",
+        amount: "",
+        status: "Sale",
+      });
+      fetchSales();
+    } catch (err) {
+      console.error("Failed to add sale", err);
+    }
   };
 
   const filteredData = salesList.filter(sale =>
@@ -101,7 +136,7 @@ export function SalesPage() {
       key: "amount",
       label: "Closed Value",
       sortable: true,
-      render: (value: number) => <span className="font-bold text-slate-800">${value.toLocaleString()}</span>,
+      render: (value: number) => <span className="font-bold text-slate-800">{value.toLocaleString()}</span>,
     },
     {
       key: "status",
@@ -235,19 +270,25 @@ export function SalesPage() {
       >
         <form onSubmit={handleSubmit} className="p-1">
           <div className="grid grid-cols-2 gap-4">
-            <Input
+            <Select
               label="Customer Name"
               required
               value={formData.customer}
               onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-              placeholder="e.g. Acme Corp"
+              options={[
+                { value: "", label: "Select Customer..." },
+                ...customers.map(c => ({ value: c.name, label: c.name }))
+              ]}
             />
-            <Input
+            <Select
               label="Product Name"
               required
               value={formData.product}
               onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-              placeholder="e.g. Standard Feed Box"
+              options={[
+                { value: "", label: "Select Product..." },
+                ...products.map(p => ({ value: p.name, label: p.name }))
+              ]}
             />
             <Input
               label="Deal Value ($)"

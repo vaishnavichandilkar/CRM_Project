@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Search, Edit, Trash2, Eye } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Edit, Trash2, Eye, Phone } from "lucide-react";
 
 interface Column {
   key: string;
@@ -14,6 +14,7 @@ interface DataTableProps {
   onEdit?: (row: any) => void;
   onDelete?: (row: any) => void;
   onView?: (row: any) => void;
+  onLogCall?: (row: any) => void;
   searchable?: boolean;
   searchPlaceholder?: string;
 }
@@ -24,6 +25,7 @@ export function DataTable({
   onEdit,
   onDelete,
   onView,
+  onLogCall,
   searchable = true,
   searchPlaceholder = "Search...",
 }: DataTableProps) {
@@ -103,7 +105,7 @@ export function DataTable({
                   )}
                 </th>
               ))}
-              {(onEdit || onDelete || onView) && (
+              {(onEdit || onDelete || onView || onLogCall) && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -118,9 +120,18 @@ export function DataTable({
                     {column.render ? column.render(row[column.key], row) : row[column.key]}
                   </td>
                 ))}
-                {(onEdit || onDelete || onView) && (
+                {(onEdit || onDelete || onView || onLogCall) && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2">
+                      {onLogCall && (
+                        <button
+                          onClick={() => onLogCall(row)}
+                          className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+                          title="Reschedule & Log Call"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </button>
+                      )}
                       {onView && (
                         <button
                           onClick={() => onView(row)}
@@ -160,3 +171,4 @@ export function DataTable({
     </div>
   );
 }
+

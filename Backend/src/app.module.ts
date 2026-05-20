@@ -24,6 +24,7 @@ import { UserPreferencesModule } from './modules/user-preferences/user-preferenc
 import { UserModulePreferencesModule } from './modules/user-module-preferences/user-module-preferences.module';
 import { CustomModulesModule } from './modules/custom-modules/custom-modules.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { SalesModule } from './modules/sales/sales.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     UserModulePreferencesModule,
     CustomModulesModule,
     LeadsModule,
+    SalesModule,
   ],
   controllers: [],
   providers: [

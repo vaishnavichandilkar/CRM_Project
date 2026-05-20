@@ -49,11 +49,49 @@ export class LeadsService {
     const oldStatus = lead.status;
     const newStatus = status || oldStatus;
 
+    const filteredLeadData: any = {};
+    const allowedLeadKeys = [
+      'leadNumber',
+      'source',
+      'notes',
+      'customerName',
+      'mobileNumber',
+      'alternateMobile',
+      'email',
+      'gstNumber',
+      'companyName',
+      'address',
+      'city',
+      'state',
+      'country',
+      'pincode',
+      'customerType',
+      'contactPerson',
+      'productName',
+      'productCode',
+      'category',
+      'brand',
+      'unit',
+      'price',
+      'tax',
+      'stockQuantity',
+      'description',
+      'customerData',
+      'productData',
+      'leadData',
+      'isConverted',
+    ];
+    for (const key of allowedLeadKeys) {
+      if (leadData[key] !== undefined) {
+        filteredLeadData[key] = leadData[key];
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedLead = await tx.lead.update({
         where: { id: leadId },
         data: {
-          ...leadData,
+          ...filteredLeadData,
           status: newStatus,
           isConverted: newStatus === LeadStatus.WON ? true : lead.isConverted,
           customer: customerId ? { connect: { id: customerId } } : customerId === null ? { disconnect: true } : undefined,
@@ -194,7 +232,8 @@ export class LeadsService {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    const todayFollowups = await this.prisma.leadFollowup.count({
+    const todayFollowupsGroup = await this.prisma.leadFollowup.groupBy({
+      by: ['leadId'],
       where: {
         callDate: {
           gte: startOfToday,
@@ -202,8 +241,10 @@ export class LeadsService {
         },
       },
     });
+    const todayFollowups = todayFollowupsGroup.length;
 
-    const upcomingFollowups = await this.prisma.leadFollowup.count({
+    const upcomingFollowupsGroup = await this.prisma.leadFollowup.groupBy({
+      by: ['leadId'],
       where: {
         callDate: {
           gt: endOfToday,
@@ -211,8 +252,10 @@ export class LeadsService {
         status: 'PENDING',
       },
     });
+    const upcomingFollowups = upcomingFollowupsGroup.length;
 
-    const missedFollowups = await this.prisma.leadFollowup.count({
+    const missedFollowupsGroup = await this.prisma.leadFollowup.groupBy({
+      by: ['leadId'],
       where: {
         callDate: {
           lt: startOfToday,
@@ -220,12 +263,15 @@ export class LeadsService {
         status: 'PENDING',
       },
     });
+    const missedFollowups = missedFollowupsGroup.length;
 
-    const completedFollowups = await this.prisma.leadFollowup.count({
+    const completedFollowupsGroup = await this.prisma.leadFollowup.groupBy({
+      by: ['leadId'],
       where: {
         status: 'COMPLETED',
       },
     });
+    const completedFollowups = completedFollowupsGroup.length;
 
     const convertedSales = await this.prisma.lead.count({ where: { isConverted: true } });
 
@@ -343,6 +389,7 @@ export class LeadsService {
         assignedTo: { select: { firstName: true, lastName: true } },
         customer: true,
         product: true,
+        followups: true,
       },
       orderBy: { createdAt: 'desc' },
     });
