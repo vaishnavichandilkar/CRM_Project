@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Plus, Phone, Mail, Calendar, User, Eye, Activity, CheckCircle2, Clock, Trash2, Database, MoreVertical, Edit, Search, Tag, AlertCircle, FileText, Landmark, RefreshCw, Settings, GripVertical, MessageSquare } from "lucide-react";
+import { Plus, Phone, Mail, Calendar, User, Eye, Activity, CheckCircle2, Clock, Trash2, Database, MoreVertical, Edit, Search, Tag, AlertCircle, FileText, Landmark, RefreshCw, Settings, GripVertical, MessageSquare, Upload, Download } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { DataTable } from "../components/ui/DataTable";
 import { Button } from "../components/ui/Button";
@@ -11,9 +11,14 @@ import { AppDispatch, RootState } from "../store/store";
 import { fetchLeads, fetchEligibleStaff } from "../store/slices/leadSlice";
 import { leadsService, LeadSource } from "../services/leadService";
 import { dynamicMastersService } from "../../services/masters.service";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import { useLocation } from "react-router";
 
 export function LeadsPage() {
   const dispatch = useDispatch<AppDispatch>();
+  const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { leadsList, eligibleStaff, loading } = useSelector((state: RootState) => state.leads);
   
   // Dashboard & Dropdowns States
@@ -35,11 +40,14 @@ export function LeadsPage() {
   const [followupFilter, setFollowupFilter] = useState<"today" | "upcoming" | "missed" | "completed">("today");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
   const [followupsList, setFollowupsList] = useState<any[]>([]);
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isStatusRemarkModalOpen, setIsStatusRemarkModalOpen] = useState(false);
   const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
@@ -141,6 +149,71 @@ export function LeadsPage() {
     loadData();
   }, [dispatch]);
 
+  useEffect(() => {
+    const handleRouteState = async () => {
+      if (location.state?.filter) {
+        setActiveFilter(location.state.filter);
+        window.history.replaceState({}, document.title);
+      }
+      
+      if (location.state?.viewLeadId) {
+        const lead = leadsList.find((l: any) => l.id === location.state.viewLeadId);
+        if (lead) {
+           handleView(lead);
+        } else {
+           try {
+             const leadDetails = await leadsService.getLeadDetails(location.state.viewLeadId);
+             handleView(leadDetails);
+           } catch(e) {}
+        }
+        window.history.replaceState({}, document.title);
+      }
+
+      if (location.state?.editLeadId) {
+        const lead = leadsList.find((l: any) => l.id === location.state.editLeadId);
+        if (lead) {
+           handleEdit(lead);
+        } else {
+           try {
+             const leadDetails = await leadsService.getLeadDetails(location.state.editLeadId);
+             handleEdit(leadDetails);
+           } catch(e) {}
+        }
+        window.history.replaceState({}, document.title);
+      }
+    };
+    
+    if (location.state && (leadsList.length > 0 || location.state.filter)) {
+      handleRouteState();
+    }
+  }, [location.state, leadsList]);
+
+  // Recalculate dynamic product prices automatically when customerType changes
+  useEffect(() => {
+    if (selectedProducts.length > 0) {
+      const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+      setSelectedProducts(prev => prev.map(p => {
+        let newPrice = p.price;
+        if (custType.includes('dealer') || custType.includes('wholesale')) {
+          const dealerRate = p.productData?.dealerRate || p.productData?.['Dealer Rate'];
+          if (dealerRate !== undefined) newPrice = parseFloat(dealerRate);
+        } else {
+          const customerRate = p.productData?.customerRate || p.productData?.['Customer Rate'];
+          if (customerRate !== undefined) newPrice = parseFloat(customerRate);
+        }
+        
+        const qty = p.qty || 1;
+        const discountAmt = p.discountAmount || 0;
+        
+        return {
+          ...p,
+          price: newPrice,
+          afterDiscountPrice: (newPrice * qty) - discountAmt
+        };
+      }));
+    }
+  }, [formData.customerType, formData.type, formData.customerData?.type]);
+
   const loadLeadFollowups = async (leadId: number) => {
     try {
       const logs = await leadsService.getFollowups(leadId);
@@ -195,6 +268,7 @@ export function LeadsPage() {
 
   const handleAddNew = () => {
     setSelectedLead(null);
+    setIsNewCustomer(false);
     setFormData({
       customerId: "",
       productId: "",
@@ -240,6 +314,7 @@ export function LeadsPage() {
 
   const handleEdit = (lead: any) => {
     setSelectedLead(lead);
+    setIsNewCustomer(!lead.customerId && !!lead.customerName);
     setFormData({
       customerId: lead.customerId || "",
       productId: lead.productId || "",
@@ -370,6 +445,17 @@ export function LeadsPage() {
   const handleProductSelect = async (id: number) => {
     try {
       const details = await leadsService.getProductDetails(id);
+      let defaultPrice = details.price ? parseFloat(details.price) : 0;
+      
+      const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+      if (custType.includes('dealer') || custType.includes('wholesale')) {
+        const dealerRate = details.productData?.dealerRate || details.productData?.['Dealer Rate'] || details.dealerRate;
+        if (dealerRate) defaultPrice = parseFloat(dealerRate);
+      } else {
+        const customerRate = details.productData?.customerRate || details.productData?.['Customer Rate'] || details.customerRate;
+        if (customerRate) defaultPrice = parseFloat(customerRate);
+      }
+
       setFormData(prev => ({
         ...prev,
         productId: id,
@@ -377,11 +463,12 @@ export function LeadsPage() {
         productCode: details.sku || details.productCode || "",
         category: details.category || "General",
         brand: details.brand || "",
-        unit: details.unit || "",
-        price: details.price ? parseFloat(details.price) : 0,
+        unit: details.quantity || details.productData?.quantity || "",
+        price: defaultPrice,
         tax: details.tax ? parseFloat(details.tax) : 0,
         stockQuantity: details.stockQuantity ? parseInt(details.stockQuantity) : 0,
         description: details.description || "",
+        productData: details,
       }));
     } catch (err) {
       console.error("Error auto-fetching product data", err);
@@ -394,7 +481,18 @@ export function LeadsPage() {
         return;
       }
       const details = await leadsService.getProductDetails(id);
-      const defaultPrice = details.price ? parseFloat(details.price) : 0;
+      let defaultPrice = details.price ? parseFloat(details.price) : 0;
+      
+      // Dynamic Pricing based on Customer Type
+      const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+      if (custType.includes('dealer') || custType.includes('wholesale')) {
+        const dealerRate = details.productData?.dealerRate || details.productData?.['Dealer Rate'] || details.dealerRate;
+        if (dealerRate) defaultPrice = parseFloat(dealerRate);
+      } else {
+        const customerRate = details.productData?.customerRate || details.productData?.['Customer Rate'] || details.customerRate;
+        if (customerRate) defaultPrice = parseFloat(customerRate);
+      }
+
       const defaultQty = details.stockQuantity ? parseInt(details.stockQuantity) : 1;
       setSelectedProducts(prev => [
         ...prev,
@@ -404,12 +502,12 @@ export function LeadsPage() {
           sku: details.sku || details.productCode || "",
           category: details.category || "General",
           brand: details.brand || "",
-          unit: details.unit || "",
+          unit: details.quantity || details.productData?.quantity || "",
           price: defaultPrice,
           tax: details.tax ? parseFloat(details.tax) : 0,
           stockQuantity: details.stockQuantity ? parseInt(details.stockQuantity) : 0,
           description: details.description || "",
-          productData: details.productData || {},
+          productData: details,
           qty: defaultQty,
           discountPercent: 0,
           discountAmount: 0,
@@ -420,6 +518,32 @@ export function LeadsPage() {
       console.error("Error adding product to lead", err);
     }
   };
+
+  // Recalculate dynamic product prices automatically when customerType changes
+  useEffect(() => {
+    if (selectedProducts.length > 0) {
+      const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+      setSelectedProducts(prev => prev.map(p => {
+        let newPrice = p.price;
+        if (custType.includes('dealer') || custType.includes('wholesale')) {
+          const dealerRate = p.productData?.dealerRate || p.productData?.['Dealer Rate'];
+          if (dealerRate !== undefined) newPrice = parseFloat(dealerRate);
+        } else {
+          const customerRate = p.productData?.customerRate || p.productData?.['Customer Rate'];
+          if (customerRate !== undefined) newPrice = parseFloat(customerRate);
+        }
+        
+        const qty = p.qty || 1;
+        const discountAmt = p.discountAmount || 0;
+        
+        return {
+          ...p,
+          price: newPrice,
+          afterDiscountPrice: (newPrice * qty) - discountAmt
+        };
+      }));
+    }
+  }, [formData.customerType]);
 
   const updateProductRow = (productId: number, field: string, value: any) => {
     setSelectedProducts(prev => prev.map(p => {
@@ -703,6 +827,344 @@ export function LeadsPage() {
     return true;
   });
 
+  const parseCSV = (text: string) => {
+    const lines = [];
+    let row = [""];
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          row[row.length - 1] += '"';
+          i++; // Skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        row.push('');
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++; // Skip LF
+        }
+        lines.push(row);
+        row = [''];
+      } else {
+        row[row.length - 1] += char;
+      }
+    }
+    if (row.length > 1 || row[0] !== '') {
+      lines.push(row);
+    }
+    return lines;
+  };
+
+  const handleDownloadSampleCSV = () => {
+    const headers = [
+      "sr.no",
+      "name",
+      "phone number",
+      "villaage",
+      "taluka",
+      "district",
+      "type",
+      "qty/tones",
+      "lead_status",
+      "call_status"
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    
+    // Pre-format Column C (phone number) as text for the first 100 rows so typed entries remain text
+    const range = { s: { r: 0, c: 0 }, e: { r: 100, c: 9 } };
+    ws['!ref'] = XLSX.utils.encode_range(range);
+    for (let r = 1; r <= 100; r++) {
+      const cellAddress = XLSX.utils.encode_cell({ r, c: 2 });
+      ws[cellAddress] = ws[cellAddress] || { t: 's', v: '' };
+      ws[cellAddress].z = '@';
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads Template");
+    XLSX.writeFile(wb, "leads_import_sample.xlsx");
+    toast.success("Excel sample template downloaded successfully!");
+  };
+
+  const handleExportCSV = () => {
+    const headers = [
+      "Lead Number",
+      "Status",
+      "Source",
+      "Notes",
+      "Customer Name",
+      "Email",
+      "Mobile Number",
+      "Alternate Mobile",
+      "Company Name",
+      "GST Number",
+      "Address",
+      "City",
+      "State",
+      "Country",
+      "Pincode",
+      "Customer Type",
+      "Contact Person",
+      "Product Name",
+      "Product Code",
+      "Category",
+      "Brand",
+      "Unit",
+      "Price",
+      "Tax",
+      "Stock Quantity",
+      "Description",
+      "Assigned To",
+      "Created At"
+    ];
+
+    const rows = leadsList.map((lead: any) => [
+      lead.leadNumber || "",
+      lead.status || "",
+      lead.source || "",
+      lead.notes || "",
+      lead.customerName || "",
+      lead.email || "",
+      lead.mobileNumber || "",
+      lead.alternateMobile || "",
+      lead.companyName || "",
+      lead.gstNumber || "",
+      lead.address || "",
+      lead.city || "",
+      lead.state || "",
+      lead.country || "",
+      lead.pincode || "",
+      lead.customerType || "",
+      lead.contactPerson || "",
+      lead.productName || "",
+      lead.productCode || "",
+      lead.category || "",
+      lead.brand || "",
+      lead.unit || "",
+      lead.price || 0,
+      lead.tax || 0,
+      lead.stockQuantity || 0,
+      lead.description || "",
+      lead.assignedTo ? `${lead.assignedTo.firstName} ${lead.assignedTo.lastName}` : "Unassigned",
+      lead.createdAt ? new Date(lead.createdAt).toLocaleString() : ""
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    
+    // Explicitly set phone and number columns as strings
+    const stringColIndices = [6, 7, 9, 14, 18]; // Mobile, Alternate Mobile, GST, Pincode, Product Code
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AB1000');
+    for (let r = range.s.r + 1; r <= range.e.r; r++) {
+      stringColIndices.forEach(c => {
+        const cellAddress = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellAddress]) {
+          ws[cellAddress].t = 's';
+          ws[cellAddress].z = '@';
+        }
+      });
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads Data");
+    XLSX.writeFile(wb, `leads_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Leads exported to Excel successfully!");
+  };
+
+  const handleImportCSV = async () => {
+    const file = selectedImportFile;
+    if (!file) {
+      toast.error("Please select an Excel or CSV file to upload");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const data = new Uint8Array(event.target?.result as ArrayBuffer);
+      if (!data) return;
+
+      let importToastId: string | number | undefined;
+
+      try {
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const parsed: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (parsed.length < 2) {
+          toast.error("Excel file is empty or missing headers");
+          return;
+        }
+
+        const headers = parsed[0].map((h: any) => String(h || "").trim().toLowerCase());
+        const rows = parsed.slice(1);
+
+        let successCount = 0;
+        let failCount = 0;
+        let skippedDuplicateCount = 0;
+        const importedSignatures = new Set<string>();
+
+        importToastId = toast.loading(`Starting import of ${rows.length} leads...`);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const isEmptyRow = row.every((cell) => String(cell !== undefined && cell !== null ? cell : "").trim() === "");
+          if (row.length === 0 || isEmptyRow) continue;
+
+          const leadObj: any = {};
+          headers.forEach((header, index) => {
+            const rawVal = row[index] !== undefined && row[index] !== null ? row[index] : "";
+            const val = String(rawVal).trim();
+            if (header === "lead number" || header === "leadid" || header === "lead_number") leadObj.leadNumber = val;
+            else if (header === "status" || header === "lead_status") leadObj.status = val.toUpperCase().replace(" ", "_") || "OPEN";
+            else if (header === "source") leadObj.source = val.toUpperCase().replace(" ", "_") || "OTHER";
+            else if (header === "notes" || header === "call_status") leadObj.notes = val;
+            else if (header === "customer name" || header === "name") leadObj.customerName = val;
+            else if (header === "email") leadObj.email = val;
+            else if (header === "mobile number" || header === "phone" || header === "contact" || header === "phone number") leadObj.mobileNumber = val;
+            else if (header === "alternate mobile" || header === "alternate_mobile") leadObj.alternateMobile = val;
+            else if (header === "company name" || header === "company") leadObj.companyName = val;
+            else if (header === "gst number" || header === "gst") leadObj.gstNumber = val;
+            else if (header === "address") leadObj.address = val;
+            else if (header === "city" || header === "villaage") leadObj.city = val;
+            else if (header === "state" || header === "taluka") leadObj.state = val;
+            else if (header === "country" || header === "district") leadObj.country = val;
+            else if (header === "pincode" || header === "zip") leadObj.pincode = val;
+            else if (header === "customer type" || header === "type") leadObj.customerType = val;
+            else if (header === "contact person" || header === "contact_person") leadObj.contactPerson = val;
+            else if (header === "product name" || header === "product") leadObj.productName = val;
+            else if (header === "product code" || header === "sku") leadObj.productCode = val;
+            else if (header === "category") leadObj.category = val;
+            else if (header === "brand") leadObj.brand = val;
+            else if (header === "unit") leadObj.unit = val;
+            else if (header === "price") leadObj.price = parseFloat(val) || 0;
+            else if (header === "tax") leadObj.tax = parseFloat(val) || 0;
+            else if (header === "stock quantity" || header === "qty" || header === "qty/tones") leadObj.stockQuantity = parseInt(val) || 0;
+            else if (header === "description") leadObj.description = val;
+          });
+
+          if (!leadObj.customerName) {
+            failCount++;
+            continue;
+          }
+
+          const sigName = (leadObj.customerName || "").trim().toLowerCase();
+          const sigPhone = (leadObj.mobileNumber || "").trim();
+          const sigEmail = (leadObj.email || "").trim().toLowerCase();
+          const signature = `${sigName}_${sigPhone}_${sigEmail}`;
+
+          if (importedSignatures.has(signature)) {
+            skippedDuplicateCount++;
+            continue;
+          }
+
+          const isExisting = leadsList.some((existingLead: any) => {
+             const eName = (existingLead.customerName || "").trim().toLowerCase();
+             const ePhone = (existingLead.mobileNumber || "").trim();
+             const eEmail = (existingLead.email || "").trim().toLowerCase();
+             
+             if (eName === sigName) {
+                if (sigPhone && ePhone === sigPhone) return true;
+                if (sigEmail && eEmail === sigEmail) return true;
+                if (!sigPhone && !sigEmail) return true;
+             }
+             return false;
+          });
+
+          if (isExisting) {
+            skippedDuplicateCount++;
+            continue;
+          }
+
+          importedSignatures.add(signature);
+
+          const payload = {
+            status: leadObj.status || "OPEN",
+            source: leadObj.source || "OTHER",
+            notes: leadObj.notes || "",
+            customerName: leadObj.customerName,
+            email: leadObj.email || undefined,
+            mobileNumber: leadObj.mobileNumber || "",
+            alternateMobile: leadObj.alternateMobile || "",
+            companyName: leadObj.companyName || "",
+            gstNumber: leadObj.gstNumber || "",
+            address: leadObj.address || "",
+            city: leadObj.city || "",
+            state: leadObj.state || "",
+            country: leadObj.country || "",
+            pincode: leadObj.pincode || "",
+            customerType: leadObj.customerType || "Retail",
+            contactPerson: leadObj.contactPerson || "",
+            productName: leadObj.productName || "",
+            productCode: leadObj.productCode || "",
+            category: leadObj.category || "General",
+            brand: leadObj.brand || "",
+            unit: leadObj.unit || "",
+            price: leadObj.price || 0,
+            tax: leadObj.tax || 0,
+            stockQuantity: leadObj.stockQuantity || 0,
+            description: leadObj.description || "",
+            customerData: {
+              name: leadObj.customerName,
+              email: leadObj.email || "",
+              phone: leadObj.mobileNumber || "",
+              region: "North",
+              type: leadObj.customerType || "Retail",
+              address: leadObj.address || "",
+              villaage: leadObj.city || "",
+              taluka: leadObj.state || "",
+              district: leadObj.country || ""
+            },
+            productData: leadObj.productName ? {
+              selectedProducts: [{
+                name: leadObj.productName,
+                price: leadObj.price || 0,
+                tax: leadObj.tax || 0,
+                qty: leadObj.stockQuantity || 1,
+                category: leadObj.category || "General",
+                description: leadObj.description || "",
+                afterDiscountPrice: (leadObj.price || 0) * (leadObj.stockQuantity || 1)
+              }]
+            } : undefined
+          };
+
+          try {
+            await leadsService.createLead(payload);
+            successCount++;
+            if (importToastId) toast.loading(`Importing leads... (${successCount}/${rows.length})`, { id: importToastId });
+          } catch (err) {
+            console.error(`Row ${i} import failed`, err);
+            failCount++;
+          }
+        }
+
+        if (importToastId) toast.dismiss(importToastId);
+        setIsImportModalOpen(false);
+        setSelectedImportFile(null);
+        if (successCount > 0) {
+          toast.success(`Successfully imported ${successCount} leads!`);
+          loadData();
+        }
+        if (skippedDuplicateCount > 0) {
+          toast.info(`Skipped ${skippedDuplicateCount} duplicate leads.`);
+        }
+        if (failCount > 0) {
+          toast.error(`${failCount} rows failed to import due to validation errors.`);
+        }
+      } catch (error: any) {
+        if (importToastId) toast.dismiss(importToastId);
+        toast.error(`Failed to parse Excel file: ${error?.message || "Unknown error"}`);
+        console.error(error);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -714,6 +1176,14 @@ export function LeadsPage() {
           <Button onClick={openSchemaSettings} variant="secondary" className="h-11 px-5 rounded-xl border-slate-200 hover:bg-slate-50 transition-all font-semibold text-slate-600 flex items-center">
             <Settings className="w-4 h-4 mr-2" />
             Manage Columns
+          </Button>
+          <Button onClick={() => { setIsImportModalOpen(true); setSelectedImportFile(null); }} variant="secondary" className="h-11 px-4 rounded-xl border-slate-200 hover:bg-slate-50 transition-all font-semibold text-slate-600 flex items-center">
+            <Upload className="w-4 h-4 mr-2 text-emerald-600" />
+            Import
+          </Button>
+          <Button onClick={handleExportCSV} variant="secondary" className="h-11 px-4 rounded-xl border-slate-200 hover:bg-slate-50 transition-all font-semibold text-slate-600 flex items-center">
+            <Download className="w-4 h-4 mr-2 text-indigo-600" />
+            Export
           </Button>
           <Button onClick={handleAddNew} variant="primary" className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100/50 h-11 px-6 rounded-xl transition-all active:scale-95 flex items-center font-bold">
             <Plus className="w-5 h-5 mr-2" />
@@ -780,6 +1250,67 @@ export function LeadsPage() {
         </CardContent>
       </Card>
 
+      {/* Import Leads Modal */}
+      <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Import Leads" size="md">
+        <div className="p-6 space-y-6 flex flex-col items-center">
+          {/* Download Sample Section */}
+          <div className="w-full text-center space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50">
+            <p className="text-sm font-medium text-slate-500">
+              Download our pre-formatted Excel template to ensure your data matches the CRM layout.
+            </p>
+            <Button
+              onClick={handleDownloadSampleCSV}
+              variant="secondary"
+              className="bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/50 text-emerald-800 font-bold py-2.5 px-6 rounded-xl flex items-center gap-2 mx-auto transition-all active:scale-95 shadow-sm shadow-emerald-50/50"
+            >
+              <Download className="w-4 h-4 text-emerald-700" />
+              Download Sample
+            </Button>
+          </div>
+
+          {/* Upload File Section */}
+          <div className="w-full space-y-3">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
+              Upload Excel / CSV File
+            </h4>
+            <div className="flex items-center gap-4 border border-slate-100 rounded-xl p-4 bg-slate-50/30">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-24">Select File</span>
+              <div className="flex-1 flex items-center gap-3">
+                <label className="cursor-pointer bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                  Choose File
+                  <input
+                    type="file"
+                    onChange={(e) => setSelectedImportFile(e.target.files?.[0] || null)}
+                    accept=".csv, .xlsx, .xls"
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-sm font-medium text-slate-600 truncate max-w-[200px]">
+                  {selectedImportFile ? selectedImportFile.name : "No file chosen"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="w-full pt-4">
+            <Button
+              onClick={handleImportCSV}
+              disabled={!selectedImportFile}
+              variant="primary"
+              className={`w-full font-bold h-11 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
+                selectedImportFile
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100/50 active:scale-95"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Submit
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Add / Edit Lead Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedLead ? "Edit Lead Details" : "Create New Lead"} size="xl">
         <form onSubmit={handleSubmit} className="px-2">
@@ -794,21 +1325,68 @@ export function LeadsPage() {
               
               {/* Customer autofilled form grid */}
               <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Customer Name"
-                  required
-                  value={formData.customerId?.toString() || ""}
-                  onChange={(e) => {
-                    const id = parseInt(e.target.value);
-                    if (id) {
-                      handleCustomerSelect(id);
-                    } else {
-                      setFormData({ ...formData, customerId: "", customerName: "", email: "", mobileNumber: "", address: "" });
-                    }
-                  }}
-                  options={customers.map(c => ({ value: c.id.toString(), label: c.name }))}
-                  placeholder="Select Customer..."
-                />
+                {isNewCustomer ? (
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      label="Customer Name"
+                      required
+                      value={formData.customerName || ""}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          customerName: e.target.value,
+                          customerData: { ...(formData.customerData || {}), name: e.target.value }
+                        });
+                      }}
+                      placeholder="Enter new customer name"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNewCustomer(false);
+                        setFormData({ ...formData, customerId: "", customerName: "", email: "", mobileNumber: "", address: "" });
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 text-left font-semibold mt-1 self-start"
+                    >
+                      ← Select Existing Customer
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <Select
+                      label="Customer Name"
+                      required
+                      value={formData.customerId?.toString() || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "new") {
+                          setIsNewCustomer(true);
+                          setFormData({ 
+                            ...formData, 
+                            customerId: "", 
+                            customerName: "", 
+                            email: "", 
+                            mobileNumber: "", 
+                            address: "",
+                            customerData: {} 
+                          });
+                        } else {
+                          const id = parseInt(val);
+                          if (id) {
+                            handleCustomerSelect(id);
+                          } else {
+                            setFormData({ ...formData, customerId: "", customerName: "", email: "", mobileNumber: "", address: "" });
+                          }
+                        }
+                      }}
+                      options={[
+                        ...customers.map(c => ({ value: c.id.toString(), label: c.name })),
+                        { value: "new", label: "+ Add New Customer" }
+                      ]}
+                      placeholder="Select Customer..."
+                    />
+                  </div>
+                )}
                 {customerConfig && customerConfig.length > 0 ? (
                   customerConfig.map((field: any) => {
                     if (field.key === 'name' || field.key === 'customerName') return null;
@@ -891,6 +1469,14 @@ export function LeadsPage() {
                               if (['name', 'productName', 'sku', 'productCode', 'category', 'brand', 'unit', 'price', 'tax', 'stockQuantity', 'description'].includes(field.key)) {
                                 return null;
                               }
+                              
+                              const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+                              const isRetail = custType.includes("retail") || custType.includes("customer");
+                              const isWholesale = custType.includes("wholesale") || custType.includes("dealer");
+                              
+                              if (field.key === 'dealerRate' && isRetail) return null;
+                              if (field.key === 'customerRate' && isWholesale) return null;
+
                               return (
                                 <th key={field.key} className="px-3 py-2.5 text-left">{field.label}</th>
                               );
@@ -957,9 +1543,31 @@ export function LeadsPage() {
                                   if (['name', 'productName', 'sku', 'productCode', 'category', 'brand', 'unit', 'price', 'tax', 'stockQuantity', 'description'].includes(field.key)) {
                                     return null;
                                   }
-                                  const customVal = p.productData?.[field.key] || p[field.key] || "N/A";
+                                  
+                                  const custType = (formData.type || formData.customerData?.type || formData.customerType || "").toLowerCase();
+                                  const isRetail = custType.includes("retail") || custType.includes("customer");
+                                  const isWholesale = custType.includes("wholesale") || custType.includes("dealer");
+                                  
+                                  if (field.key === 'dealerRate' && isRetail) return null;
+                                  if (field.key === 'customerRate' && isWholesale) return null;
+
+                                  const customVal = p[field.key] !== undefined ? p[field.key] : (p.productData?.[field.key] ?? "");
                                   return (
-                                    <td key={field.key} className="px-3 py-2 text-slate-500">{customVal}</td>
+                                    <td key={field.key} className="px-3 py-2">
+                                      <input
+                                        type={field.dataType === 'number' ? 'number' : 'text'}
+                                        value={customVal}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          updateProductRow(p.id, field.key, val);
+                                          
+                                          if ((field.key === 'dealerRate' && isWholesale) || (field.key === 'customerRate' && isRetail)) {
+                                            updateProductRow(p.id, 'price', val);
+                                          }
+                                        }}
+                                        className={`px-1.5 py-0.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white ${field.dataType === 'number' ? 'w-20 text-right font-bold' : 'w-28'}`}
+                                      />
+                                    </td>
                                   );
                                 })}
                                 <td className="px-3 py-2 text-center">
@@ -1088,8 +1696,41 @@ export function LeadsPage() {
                   ]}
                 />
 
+                <Select 
+                  label="Lead Status" 
+                  value={formData.status || "OPEN"} 
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  options={[
+                    { value: "OPEN", label: "Open" },
+                    { value: "IN_PROGRESS", label: "In Progress" },
+                    { value: "WON", label: "Won" },
+                    { value: "LOST", label: "Lost" }
+                  ]}
+                />
+
+                <Select 
+                  label="Lead Source" 
+                  value={formData.source || "OTHER"} 
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  options={[
+                    { value: "META_ADS", label: "Meta Ads" },
+                    { value: "GOOGLE_ADS", label: "Google Ads" },
+                    { value: "REFERRAL", label: "Referral" },
+                    { value: "WEBSITE", label: "Website" },
+                    { value: "OTHER", label: "Other" }
+                  ]}
+                />
+
                 {leadConfig && leadConfig.length > 0 ? (
                   leadConfig.map((field: any) => {
+                    // Skip native fields that are already hardcoded in the 3 sections
+                    if ([
+                      'customerName', 'mobileNumber', 'email', 'address', 'city', 'state', 'country', 'pincode', 'customerType',
+                      'productName', 'productCode', 'category', 'price', 'stockQuantity', 'assignedToId',
+                      'source', 'status'
+                    ].includes(field.key)) {
+                      return null;
+                    }
                     const commonProps = {
                       key: field.key,
                       label: field.label,
@@ -1236,16 +1877,32 @@ export function LeadsPage() {
                 <div className="pt-2 border-t border-slate-200/50">
                   <span className="text-slate-400 block mb-1">Product Interest</span>
                   {selectedLead?.productData?.selectedProducts && Array.isArray(selectedLead.productData.selectedProducts) && selectedLead.productData.selectedProducts.length > 0 ? (
-                    <div className="space-y-1.5 mt-1">
+                    <div className="space-y-2 mt-1.5">
                       {selectedLead.productData.selectedProducts.map((p: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100/80">
-                          <span className="font-bold text-indigo-900 text-xs">{p.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{p.sku}</span>
+                        <div key={idx} className="flex flex-col bg-white p-2.5 rounded-lg border border-slate-100/80 gap-1.5 shadow-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-bold text-indigo-900 text-xs leading-tight pr-2">{p.name || p.productName}</span>
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 whitespace-nowrap">
+                              {p.sku || p.productCode || 'No SKU'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
+                            <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">Qty: {p.qty || 1}</span>
+                            <span className="font-bold text-emerald-600">₹{p.price ? Number(p.price).toFixed(2) : '0.00'}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <span className="font-bold text-indigo-900">{selectedLead?.productName || 'N/A'}</span>
+                    <div className="flex flex-col gap-1 mt-1.5">
+                      <span className="font-bold text-indigo-900">{selectedLead?.productName || 'N/A'}</span>
+                      {selectedLead?.productName && (
+                        <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium mt-0.5">
+                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">Qty: {selectedLead?.stockQuantity || 1}</span>
+                          <span className="font-bold text-emerald-600">₹{selectedLead?.price ? Number(selectedLead.price).toFixed(2) : '0.00'}</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -1337,8 +1994,21 @@ export function LeadsPage() {
       </Modal>
 
       {/* Reschedule & Log Call Modal */}
-      <Modal isOpen={isLogCallModalOpen} onClose={() => setIsLogCallModalOpen(false)} title={`Reschedule Call & Log Conversation: ${selectedLead?.customerName || 'Lead'}`} size="xl">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-1">
+      {(() => {
+        const contactNo = selectedLead ? [
+          selectedLead.mobileNumber, 
+          selectedLead.phone, 
+          selectedLead.customerData?.phone, 
+          selectedLead.customerData?.mobileNumber, 
+          selectedLead.leadData?.phone, 
+          selectedLead.leadData?.mobileNumber, 
+          selectedLead.customer?.data?.phone, 
+          selectedLead.customer?.data?.mobileNumber
+        ].find(Boolean) : null;
+        
+        return (
+          <Modal isOpen={isLogCallModalOpen} onClose={() => setIsLogCallModalOpen(false)} title={`Reschedule Call & Log Conversation: ${selectedLead?.customerName || 'Lead'} ${contactNo ? `(${contactNo})` : ''}`} size="xl">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-1">
           
           {/* Left Column: Log Conversation and Reschedule Form */}
           <div className="md:col-span-6 space-y-4">
@@ -1461,6 +2131,8 @@ export function LeadsPage() {
 
         </div>
       </Modal>
+      );
+      })()}
 
       {/* Status Transition Remarks Prompt Modal */}
       <Modal isOpen={isStatusRemarkModalOpen} onClose={() => setIsStatusRemarkModalOpen(false)} title="Confirm Status Update Workflow" size="sm">
@@ -1499,28 +2171,46 @@ export function LeadsPage() {
           <p className="text-sm text-gray-500">Define the custom data fields for Leads. These will appear in the Lead Creation Form under Additional Details.</p>
           <div className="space-y-2">
             {schemaFields.map((field, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <GripVertical className="text-gray-400 cursor-move" />
-                <div className="flex-1 grid grid-cols-4 gap-2">
-                  <Input placeholder="Label (e.g. Budget)" value={field.label} onChange={(e) => updateSchemaField(index, { label: e.target.value })} />
-                  <Input placeholder="Key (e.g. budget)" value={field.key} onChange={(e) => updateSchemaField(index, { key: e.target.value })} />
-                  <Select 
-                    value={field.dataType} 
-                    onChange={(e) => updateSchemaField(index, { dataType: e.target.value })}
-                    options={[
-                      { value: "string", label: "Short Answer" },
-                      { value: "number", label: "Number" },
-                      { value: "paragraph", label: "Paragraph" },
-                      { value: "dropdown", label: "Drop-down" },
-                      { value: "date", label: "Date" },
-                    ]}
-                  />
-                  <div className="flex items-center gap-2 px-2">
-                    <input type="checkbox" checked={field.validationRules?.required} onChange={(e) => updateSchemaField(index, { validationRules: { ...field.validationRules, required: e.target.checked } })} />
-                    <span className="text-sm">Required</span>
+              <div key={index} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-3 w-full">
+                  <GripVertical className="text-gray-400 cursor-move" />
+                  <div className="flex-1 grid grid-cols-4 gap-2">
+                    <Input placeholder="Label (e.g. Budget)" value={field.label} onChange={(e) => updateSchemaField(index, { label: e.target.value })} />
+                    <Input placeholder="Key (e.g. budget)" value={field.key} onChange={(e) => updateSchemaField(index, { key: e.target.value })} />
+                    <Select 
+                      value={field.dataType} 
+                      onChange={(e) => updateSchemaField(index, { dataType: e.target.value })}
+                      options={[
+                        { value: "string", label: "Short Answer" },
+                        { value: "number", label: "Number" },
+                        { value: "paragraph", label: "Paragraph" },
+                        { value: "dropdown", label: "Drop-down" },
+                        { value: "date", label: "Date" },
+                      ]}
+                    />
+                    <div className="flex items-center gap-2 px-2">
+                      <input type="checkbox" checked={field.validationRules?.required} onChange={(e) => updateSchemaField(index, { validationRules: { ...field.validationRules, required: e.target.checked } })} />
+                      <span className="text-sm">Required</span>
+                    </div>
                   </div>
+                  <button type="button" onClick={() => removeSchemaField(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                 </div>
-                <button onClick={() => removeSchemaField(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                {field.dataType === "dropdown" && (
+                  <div className="pl-8 pr-10 flex items-center gap-3 w-full">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-36 shrink-0">Dropdown Options:</span>
+                    <Input 
+                      placeholder="Enter options separated by commas (e.g. OPEN, IN_PROGRESS, WON, LOST)" 
+                      value={field.options?.join(",") || ""} 
+                      onChange={(e) => updateSchemaField(index, { 
+                        options: e.target.value.split(",") 
+                      })}
+                      onBlur={(e) => updateSchemaField(index, { 
+                        options: e.target.value.split(",").map(s => s.trim()).filter(s => s.length > 0) 
+                      })}
+                      className="flex-1 h-9 text-xs rounded-lg"
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>

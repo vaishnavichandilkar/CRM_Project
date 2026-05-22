@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Plus, ArrowRight, RefreshCw, Layers } from "lucide-react";
+import { Plus, ArrowRight, RefreshCw, Layers, Eye, Edit } from "lucide-react";
+import { useNavigate } from "react-router";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { DataTable } from "../components/ui/DataTable";
 import { Button } from "../components/ui/Button";
@@ -10,12 +11,14 @@ import { leadsService } from "../services/leadService";
 import { salesService } from "../../services/sales.service";
 
 export function SalesPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"fresh" | "resale">("fresh");
   const [salesList, setSalesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [funnelStats, setFunnelStats] = useState({ leads: 0, opps: 0 });
   const [formData, setFormData] = useState({
     customer: "",
     product: "",
@@ -32,6 +35,11 @@ export function SalesPage() {
       setProducts(prodData);
       
       const leads = await leadsService.getAllLeads();
+      setFunnelStats({
+        leads: leads.length,
+        opps: leads.filter((l: any) => l.status === 'IN_PROGRESS' || l.status === 'In Progress').length
+      });
+
       const wonLeads = leads.filter((l: any) => l.isConverted === true || l.status === 'WON' || l.status === 'Won');
       
       const mapped = wonLeads.map((l: any) => ({
@@ -45,30 +53,6 @@ export function SalesPage() {
         resaleCount: 0,
       }));
 
-      // Seed mock resale data so the screen looks fully populated
-      const mockResale = [
-        {
-          id: 99,
-          customer: "Jane Smith",
-          product: "Premium Chicks Feed",
-          amount: 3500,
-          status: "Invoice",
-          type: "Resale",
-          date: "2026-05-17",
-          resaleCount: 3,
-        },
-        {
-          id: 100,
-          customer: "Bob Johnson",
-          product: "Medicines & Supplements",
-          amount: 7500,
-          status: "Sale",
-          type: "Resale",
-          date: "2026-05-16",
-          resaleCount: 1,
-        }
-      ];
-
       const backendSales = await salesService.getSalesData();
       const mappedBackendSales = backendSales.map((s: any) => ({
         id: s.id,
@@ -81,7 +65,7 @@ export function SalesPage() {
         resaleCount: s.purchaseCount > 1 ? s.purchaseCount : 0,
       }));
 
-      setSalesList([...mapped, ...mockResale, ...mappedBackendSales]);
+      setSalesList([...mapped, ...mappedBackendSales]);
     } catch (err) {
       console.error("Error loading sales pipeline", err);
     } finally {
@@ -157,6 +141,36 @@ export function SalesPage() {
       render: (value: number) => <Badge variant="info" className="font-bold">{value}x Purchase</Badge>,
     }] : []),
     { key: "date", label: "Closed Date", sortable: true },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (_, item: any) => (
+        <div className="flex gap-2">
+          {item.type === "Fresh" ? (
+            <>
+              <button 
+                 onClick={() => navigate('/leads', { state: { viewLeadId: item.id } })}
+                 className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                 title="View Details"
+              >
+                 <Eye className="w-4 h-4" />
+              </button>
+              <button 
+                 onClick={() => navigate('/leads', { state: { editLeadId: item.id } })}
+                 className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                 title="Edit Lead"
+              >
+                 <Edit className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full uppercase tracking-wider">
+              Direct Sale
+            </span>
+          )}
+        </div>
+      )
+    }
   ];
 
   return (
@@ -189,14 +203,14 @@ export function SalesPage() {
           <div className="flex items-center justify-center gap-6 py-6 bg-slate-50/50 rounded-2xl border border-slate-100">
             <div className="flex flex-col items-center">
               <div className="w-14 h-14 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
-                <span className="text-lg font-extrabold text-indigo-700">{salesList.length + 8}</span>
+                <span className="text-lg font-extrabold text-indigo-700">{funnelStats.leads}</span>
               </div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Leads</span>
             </div>
             <ArrowRight className="w-5 h-5 text-slate-300" />
             <div className="flex flex-col items-center">
               <div className="w-14 h-14 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
-                <span className="text-lg font-extrabold text-orange-700">{salesList.filter(s => s.status === 'Sale').length + 3}</span>
+                <span className="text-lg font-extrabold text-orange-700">{funnelStats.opps}</span>
               </div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Opp.</span>
             </div>
@@ -210,7 +224,7 @@ export function SalesPage() {
             <ArrowRight className="w-5 h-5 text-slate-300" />
             <div className="flex flex-col items-center">
               <div className="w-14 h-14 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
-                <span className="text-lg font-extrabold text-blue-700">{salesList.filter(s => s.status === 'Invoice').length + 1}</span>
+                <span className="text-lg font-extrabold text-blue-700">{salesList.filter(s => s.status === 'Invoice').length}</span>
               </div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Invoiced</span>
             </div>

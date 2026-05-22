@@ -2,24 +2,16 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function main() {
+export async function seedMasters(prismaInstance: PrismaClient) {
   const masters = [
     {
       name: 'Products',
       slug: 'products',
       config: [
         { label: 'Product Name', key: 'name', dataType: 'string', validationRules: { required: true } },
-        { label: 'SKU', key: 'sku', dataType: 'string', validationRules: { required: true } },
-        { 
-          label: 'Category', 
-          key: 'category', 
-          dataType: 'dropdown', 
-          options: ['Feed', 'Medicine', 'Equipment', 'Chicks', 'General'],
-          validationRules: { required: true } 
-        },
-        { label: 'Price', key: 'price', dataType: 'number', validationRules: { required: true } },
-        { label: 'Stock Quantity', key: 'stockQuantity', dataType: 'number', validationRules: { required: true } },
-        { label: 'Description', key: 'description', dataType: 'paragraph' },
+        { label: 'Quantity', key: 'quantity', dataType: 'string', validationRules: { required: false } },
+        { label: 'Dealer Rate', key: 'dealerRate', dataType: 'number', validationRules: { required: false } },
+        { label: 'Customer Rate', key: 'customerRate', dataType: 'number', validationRules: { required: false } },
       ],
     },
     {
@@ -182,10 +174,36 @@ async function main() {
         },
       ],
     },
+    {
+      name: 'Leads',
+      slug: 'leads',
+      config: [
+        { label: 'Customer Name', key: 'customerName', dataType: 'string', validationRules: { required: true } },
+        { label: 'Mobile Number', key: 'mobileNumber', dataType: 'string', validationRules: { required: true } },
+        { label: 'Email', key: 'email', dataType: 'string', validationRules: { required: false } },
+        { label: 'Address', key: 'address', dataType: 'paragraph', validationRules: { required: false } },
+        { label: 'Village', key: 'city', dataType: 'string', validationRules: { required: false } },
+        { label: 'Taluka', key: 'state', dataType: 'string', validationRules: { required: false } },
+        { label: 'District', key: 'country', dataType: 'string', validationRules: { required: false } },
+        { label: 'Pincode', key: 'pincode', dataType: 'string', validationRules: { required: false } },
+        { label: 'Customer Type', key: 'customerType', dataType: 'dropdown', options: ['Retail', 'Wholesale', 'Dealer'], validationRules: { required: false } },
+        { label: 'Product Name', key: 'productName', dataType: 'string', validationRules: { required: false } },
+        { label: 'Product SKU', key: 'productCode', dataType: 'string', validationRules: { required: false } },
+        { label: 'Category', key: 'category', dataType: 'dropdown', options: ['General', 'Feed', 'Medicine', 'Equipment', 'Chicks'], validationRules: { required: false } },
+        { label: 'Price', key: 'price', dataType: 'number', validationRules: { required: false } },
+        { label: 'Stock Quantity', key: 'stockQuantity', dataType: 'number', validationRules: { required: false } },
+        { label: 'Assign Employee', key: 'assignedToId', dataType: 'dropdown', options: [], validationRules: { required: true } },
+        { label: 'Lead Source', key: 'source', dataType: 'dropdown', options: ['META_ADS', 'GOOGLE_ADS', 'REFERRAL', 'WEBSITE', 'OTHER'], validationRules: { required: true } },
+        { label: 'Lead Status', key: 'status', dataType: 'dropdown', options: ['OPEN', 'IN_PROGRESS', 'WON', 'LOST'], validationRules: { required: true } },
+        { label: 'Lead Conversation Notes', key: 'notes', dataType: 'paragraph', validationRules: { required: false } },
+        { label: 'Delivery Partner Name', key: 'deliveryPartnerName', dataType: 'string', validationRules: { required: false } },
+        { label: 'Vehicle Type', key: 'vehicleType', dataType: 'dropdown', options: ['Truck', 'Van', 'Bike', 'Other'], validationRules: { required: false } }
+      ],
+    },
   ];
 
   for (const master of masters) {
-    await prisma.masterConfig.upsert({
+    await prismaInstance.masterConfig.upsert({
       where: { slug: master.slug },
       update: { config: master.config, name: master.name },
       create: master,
@@ -194,11 +212,13 @@ async function main() {
   }
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (typeof require !== 'undefined' && require.main === module) {
+  seedMasters(prisma)
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

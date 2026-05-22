@@ -1,5 +1,7 @@
 import { PrismaClient, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedMasters } from './seed-masters';
+import { seedProductsData } from './seed-products';
 
 const prisma = new PrismaClient();
 
@@ -132,6 +134,12 @@ async function main() {
       create: c,
     });
   }
+
+  console.log('Seeding masters...');
+  await seedMasters(prisma);
+
+  console.log('Seeding agro products...');
+  await seedProductsData(prisma);
 
   console.log('Seeding completed successfully!');
 }

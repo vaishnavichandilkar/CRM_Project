@@ -52,21 +52,26 @@ export class AuthService {
   }
 
   async signin(dto: SigninDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      include: { 
-        modulePreferences: true,
-        role: {
-          include: {
-            permissions: {
-              include: {
-                permission: true
+    let user;
+    try {
+      user = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+        include: { 
+          modulePreferences: true,
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true
+                }
               }
             }
-          }
-        } 
-      },
-    });
+          } 
+        },
+      });
+    } catch (err: any) {
+      throw new UnauthorizedException(`Database Crash: ${err.message}`);
+    }
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');

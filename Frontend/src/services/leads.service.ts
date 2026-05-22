@@ -35,6 +35,16 @@ export const leadsService = {
     return response.data;
   },
 
+  getDashboardStats: async () => {
+    const response = await api.get('/leads/dashboard/stats');
+    return response.data;
+  },
+
+  getTodayNotifications: async () => {
+    const response = await api.get('/leads/dashboard/notifications');
+    return response.data;
+  },
+
   getSalesReps: async () => {
     const response = await api.get<{ id: number; name: string }[]>('/leads/eligible-staff');
     return response.data;

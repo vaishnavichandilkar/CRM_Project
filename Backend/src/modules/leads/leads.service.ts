@@ -10,8 +10,112 @@ export class LeadsService {
   constructor(private prisma: PrismaService) {}
 
   async createLead(userId: number, dto: CreateLeadDto) {
+    const rawDto = dto as any;
     const { assignedToId, customerId, productId, ...leadData } = dto;
     const initialStatus = dto.status || LeadStatus.OPEN;
+
+    let finalCustomerId = customerId;
+
+    if (!finalCustomerId && (dto.customerName || dto.email || dto.mobileNumber || rawDto.phone || dto.customerData?.name || dto.customerData?.email || dto.customerData?.phone || dto.customerData?.mobileNumber)) {
+      const customerConfig = await this.prisma.masterConfig.findUnique({
+        where: { slug: 'customers' },
+      });
+
+      if (customerConfig) {
+        const existingCustomers = await this.prisma.masterData.findMany({
+          where: { masterConfigId: customerConfig.id },
+        });
+
+        const emailToCheck = dto.email?.trim() || dto.customerData?.email?.trim();
+        const phoneToCheck = dto.mobileNumber?.trim() || dto.customerData?.phone?.trim() || rawDto.phone?.trim() || dto.customerData?.mobileNumber?.trim();
+        const nameToCheck = dto.customerName?.trim() || dto.customerData?.name?.trim();
+
+        const matchedCustomer = existingCustomers.find((c: any) => {
+          const cData = c.data as any;
+          if (!cData) return false;
+
+          const emailMatch = emailToCheck && cData.email && cData.email.toLowerCase() === emailToCheck.toLowerCase();
+          const nameMatch = nameToCheck && cData.name && cData.name.toLowerCase() === nameToCheck.toLowerCase();
+
+          // A match is only valid if:
+          // 1. The name matches exactly (case-insensitive) OR
+          // 2. The email matches exactly (case-insensitive) AND nameToCheck is either missing or matches
+          if (nameMatch) return true;
+          if (emailMatch && (!nameToCheck || !cData.name || cData.name.toLowerCase() === nameToCheck.toLowerCase())) return true;
+
+          return false;
+        });
+
+        if (matchedCustomer) {
+          finalCustomerId = matchedCustomer.id;
+        } else if (nameToCheck) {
+          const newCustomerData: any = {
+            name: nameToCheck,
+            email: emailToCheck || '',
+            phone: phoneToCheck || '',
+            region: dto.customerData?.region || rawDto.region || 'North',
+            type: dto.customerData?.type || dto.customerType || rawDto.type || 'Retail',
+            address: dto.address || dto.customerData?.address || '',
+          };
+
+          if (dto.customerData && typeof dto.customerData === 'object') {
+            for (const key of Object.keys(dto.customerData)) {
+              if (newCustomerData[key] === undefined) {
+                newCustomerData[key] = dto.customerData[key];
+              }
+            }
+          }
+
+          if (!newCustomerData.customerCode) {
+            const currentCustomerRecordsCount = await this.prisma.masterData.count({
+              where: { masterConfigId: customerConfig.id }
+            });
+            newCustomerData.customerCode = `CUST${String(currentCustomerRecordsCount + 1).padStart(3, '0')}`;
+          }
+
+          const createdCustomer = await this.prisma.masterData.create({
+            data: {
+              masterConfigId: customerConfig.id,
+              data: newCustomerData,
+            },
+          });
+
+          finalCustomerId = createdCustomer.id;
+
+          // Synchronize to static Customer table
+          try {
+            const rawRegion = (newCustomerData.region || 'North').toUpperCase();
+            const validRegion = ['NORTH', 'SOUTH', 'EAST', 'WEST'].includes(rawRegion) ? rawRegion : 'NORTH';
+            
+            const rawType = (newCustomerData.type || 'Retail').toUpperCase();
+            const validCustomerType = ['RETAIL', 'WHOLESALE'].includes(rawType) ? rawType : 'RETAIL';
+
+            const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
+              ? newCustomerData.email.trim().toLowerCase() 
+              : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
+
+            const existingStatic = await this.prisma.customer.findUnique({
+              where: { email: uniqueEmail }
+            });
+
+            if (!existingStatic) {
+              await this.prisma.customer.create({
+                data: {
+                  name: newCustomerData.name,
+                  email: uniqueEmail,
+                  phone: newCustomerData.phone || '',
+                  region: validRegion as any,
+                  type: validCustomerType as any,
+                  address: newCustomerData.address || '',
+                }
+              });
+            }
+          } catch (err) {
+            console.error("Failed to sync to static Customer model:", err);
+          }
+        }
+      }
+    }
 
     const count = await this.prisma.lead.count();
     const leadNumber = `LD-${String(count + 1).padStart(4, '0')}`;
@@ -21,7 +125,7 @@ export class LeadsService {
         ...leadData,
         leadNumber,
         status: initialStatus,
-        customer: customerId ? { connect: { id: customerId } } : undefined,
+        customer: finalCustomerId ? { connect: { id: finalCustomerId } } : undefined,
         product: productId ? { connect: { id: productId } } : undefined,
         assignedTo: assignedToId ? { connect: { id: assignedToId } } : undefined,
         history: {
@@ -48,6 +152,109 @@ export class LeadsService {
     const { assignedToId, customerId, productId, status, ...leadData } = dto;
     const oldStatus = lead.status;
     const newStatus = status || oldStatus;
+
+    let finalCustomerId = customerId;
+
+    if (!finalCustomerId && (dto.customerName || dto.email || dto.mobileNumber || dto.phone || dto.customerData?.name || dto.customerData?.email || dto.customerData?.phone || dto.customerData?.mobileNumber)) {
+      const customerConfig = await this.prisma.masterConfig.findUnique({
+        where: { slug: 'customers' },
+      });
+
+      if (customerConfig) {
+        const existingCustomers = await this.prisma.masterData.findMany({
+          where: { masterConfigId: customerConfig.id },
+        });
+
+        const emailToCheck = dto.email?.trim() || dto.customerData?.email?.trim();
+        const phoneToCheck = dto.mobileNumber?.trim() || dto.customerData?.phone?.trim() || dto.phone?.trim() || dto.customerData?.mobileNumber?.trim();
+        const nameToCheck = dto.customerName?.trim() || dto.customerData?.name?.trim();
+
+        const matchedCustomer = existingCustomers.find((c: any) => {
+          const cData = c.data as any;
+          if (!cData) return false;
+
+          const emailMatch = emailToCheck && cData.email && cData.email.toLowerCase() === emailToCheck.toLowerCase();
+          const nameMatch = nameToCheck && cData.name && cData.name.toLowerCase() === nameToCheck.toLowerCase();
+
+          // A match is only valid if:
+          // 1. The name matches exactly (case-insensitive) OR
+          // 2. The email matches exactly (case-insensitive) AND nameToCheck is either missing or matches
+          if (nameMatch) return true;
+          if (emailMatch && (!nameToCheck || !cData.name || cData.name.toLowerCase() === nameToCheck.toLowerCase())) return true;
+
+          return false;
+        });
+
+        if (matchedCustomer) {
+          finalCustomerId = matchedCustomer.id;
+        } else if (nameToCheck) {
+          const newCustomerData: any = {
+            name: nameToCheck,
+            email: emailToCheck || '',
+            phone: phoneToCheck || '',
+            region: dto.customerData?.region || dto.region || 'North',
+            type: dto.customerData?.type || dto.customerType || dto.type || 'Retail',
+            address: dto.address || dto.customerData?.address || '',
+          };
+
+          if (dto.customerData && typeof dto.customerData === 'object') {
+            for (const key of Object.keys(dto.customerData)) {
+              if (newCustomerData[key] === undefined) {
+                newCustomerData[key] = dto.customerData[key];
+              }
+            }
+          }
+
+          if (!newCustomerData.customerCode) {
+            const currentCustomerRecordsCount = await this.prisma.masterData.count({
+              where: { masterConfigId: customerConfig.id }
+            });
+            newCustomerData.customerCode = `CUST${String(currentCustomerRecordsCount + 1).padStart(3, '0')}`;
+          }
+
+          const createdCustomer = await this.prisma.masterData.create({
+            data: {
+              masterConfigId: customerConfig.id,
+              data: newCustomerData,
+            },
+          });
+
+          finalCustomerId = createdCustomer.id;
+
+          // Synchronize to static Customer table
+          try {
+            const rawRegion = (newCustomerData.region || 'North').toUpperCase();
+            const validRegion = ['NORTH', 'SOUTH', 'EAST', 'WEST'].includes(rawRegion) ? rawRegion : 'NORTH';
+            
+            const rawType = (newCustomerData.type || 'Retail').toUpperCase();
+            const validCustomerType = ['RETAIL', 'WHOLESALE'].includes(rawType) ? rawType : 'RETAIL';
+
+            const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
+              ? newCustomerData.email.trim().toLowerCase() 
+              : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
+
+            const existingStatic = await this.prisma.customer.findUnique({
+              where: { email: uniqueEmail }
+            });
+
+            if (!existingStatic) {
+              await this.prisma.customer.create({
+                data: {
+                  name: newCustomerData.name,
+                  email: uniqueEmail,
+                  phone: newCustomerData.phone || '',
+                  region: validRegion as any,
+                  type: validCustomerType as any,
+                  address: newCustomerData.address || '',
+                }
+              });
+            }
+          } catch (err) {
+            console.error("Failed to sync to static Customer model:", err);
+          }
+        }
+      }
+    }
 
     const filteredLeadData: any = {};
     const allowedLeadKeys = [
@@ -94,7 +301,7 @@ export class LeadsService {
           ...filteredLeadData,
           status: newStatus,
           isConverted: newStatus === LeadStatus.WON ? true : lead.isConverted,
-          customer: customerId ? { connect: { id: customerId } } : customerId === null ? { disconnect: true } : undefined,
+          customer: finalCustomerId ? { connect: { id: finalCustomerId } } : finalCustomerId === null ? { disconnect: true } : undefined,
           product: productId ? { connect: { id: productId } } : productId === null ? { disconnect: true } : undefined,
           assignedTo: assignedToId ? { connect: { id: assignedToId } } : assignedToId === null ? { disconnect: true } : undefined,
         },
@@ -341,6 +548,75 @@ export class LeadsService {
       where: { leadId },
       orderBy: { callDate: 'desc' },
     });
+  }
+
+  async getTodayNotifications() {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Roll forward overdue followups (Schedule for next day automatically)
+    const overdueFollowups = await this.prisma.leadFollowup.findMany({
+      where: {
+        nextFollowupDate: { lt: startOfToday },
+      },
+    });
+
+    if (overdueFollowups.length > 0) {
+      // Only roll forward if it's the LATEST followup for that lead
+      const allForLeads = await this.prisma.leadFollowup.findMany({
+        where: { leadId: { in: overdueFollowups.map(f => f.leadId) } },
+        orderBy: { createdAt: 'asc' }
+      });
+      
+      const latestFollowupsMap = new Map();
+      for (const f of allForLeads) {
+        latestFollowupsMap.set(f.leadId, f);
+      }
+
+      const idsToUpdate = [];
+      for (const f of overdueFollowups) {
+        if (latestFollowupsMap.get(f.leadId)?.id === f.id) {
+          idsToUpdate.push(f.id);
+        }
+      }
+
+      if (idsToUpdate.length > 0) {
+        await this.prisma.leadFollowup.updateMany({
+          where: { id: { in: idsToUpdate } },
+          data: { nextFollowupDate: startOfToday }
+        });
+      }
+    }
+
+    const followups = await this.prisma.leadFollowup.findMany({
+      where: {
+        OR: [
+          { callDate: { gte: startOfToday, lte: endOfToday } },
+          { nextFollowupDate: { gte: startOfToday, lte: endOfToday } }
+        ]
+      },
+      include: {
+        lead: {
+          select: { id: true, customerName: true, status: true }
+        }
+      },
+      orderBy: { callTime: 'asc' }
+    });
+
+    // Deduplicate by leadId to avoid spamming multiple notifications for the same lead today
+    const uniqueFollowups = Array.from(new Map(followups.map(item => [item.leadId, item])).values());
+
+    return uniqueFollowups.map(f => ({
+      id: f.id,
+      leadId: f.leadId,
+      title: `${f.callType} Scheduled`,
+      customerName: f.lead?.customerName || 'Unknown Lead',
+      time: f.callTime,
+      date: f.callDate || f.nextFollowupDate,
+      message: f.conversation || 'Scheduled Follow-up',
+    }));
   }
 
   async createCall(userId: number, dto: CreateCallDto) {

@@ -10,6 +10,7 @@ import { Modal, ModalFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { authService } from "../../../services/auth.service";
 import { dynamicMastersService, MasterConfig } from "../../../services/masters.service";
+import { leadsService } from "../../../services/leads.service";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,7 @@ export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mastersOpen, setMastersOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [dynamicMasters, setDynamicMasters] = useState<MasterConfig[]>([]);
   const [customModules, setCustomModules] = useState<any[]>([]);
@@ -99,6 +101,11 @@ export function MainLayout() {
           })
           .catch(console.error);
       }
+
+      // Fetch today's follow-up notifications
+      leadsService.getTodayNotifications()
+        .then(setNotifications)
+        .catch(console.error);
     }
   }, [navigate, selectedModules]);
 
@@ -239,31 +246,52 @@ export function MainLayout() {
                 className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
+                )}
               </button>
 
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="p-4 border-b border-gray-200">
-                    <h3 className="font-semibold">Notifications</h3>
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-800 text-sm">Today's Follow-ups</h3>
+                    {notifications.length > 0 && (
+                      <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {notifications.length} Pending
+                      </span>
+                    )}
                   </div>
                   <div className="max-h-96 overflow-y-auto">
-                    <NotificationItem
-                      title="New lead assigned"
-                      message="John Doe from Meta Ads"
-                      time="5 min ago"
-                    />
-                    <NotificationItem
-                      title="Follow-up reminder"
-                      message="Call Sarah Smith today"
-                      time="1 hour ago"
-                    />
-                    <NotificationItem
-                      title="Visit scheduled"
-                      message="Visit to ABC Dealers at 3 PM"
-                      time="2 hours ago"
-                    />
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 flex flex-col items-center">
+                        <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
+                        <p className="text-xs font-semibold">No follow-ups scheduled for today.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {notifications.map((n: any) => (
+                          <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer border-l-2 border-transparent hover:border-blue-500" onClick={() => { setNotificationsOpen(false); navigate('/leads', { state: { filter: 'TODAY_FOLLOWUPS' } }); }}>
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="text-xs font-bold text-slate-800">{n.title}</h4>
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{n.time}</span>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-600 mb-1">{n.customerName}</p>
+                            <p className="text-[11px] text-slate-500 truncate">{n.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {notifications.length > 0 && (
+                    <div className="p-2 border-t border-gray-100 bg-slate-50/50">
+                      <button onClick={() => { setNotificationsOpen(false); navigate('/leads', { state: { filter: 'TODAY_FOLLOWUPS' } }); }} className="w-full text-xs font-bold text-blue-600 hover:text-blue-700 py-1.5">
+                        View Leads Dashboard
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

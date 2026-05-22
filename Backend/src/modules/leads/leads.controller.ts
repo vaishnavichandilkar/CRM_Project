@@ -35,6 +35,11 @@ export class LeadsController {
     return this.leadsService.getDashboardStats();
   }
 
+  @Get('dashboard/notifications')
+  getTodayNotifications() {
+    return this.leadsService.getTodayNotifications();
+  }
+
   @Get('stats')
   getStats() {
     return this.leadsService.getStats();

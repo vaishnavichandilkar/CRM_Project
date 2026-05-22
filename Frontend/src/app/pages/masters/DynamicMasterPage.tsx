@@ -29,7 +29,7 @@ export function DynamicMasterPage() {
       setLoading(true);
       const [configData, recordsData] = await Promise.all([
         dynamicMastersService.getConfig(slug),
-        dynamicMastersService.getRecords(slug),
+        dynamicMastersService.getRecords(slug, { limit: 1000 }),
       ]);
       setConfig(configData);
       setRecords(recordsData.records);
@@ -221,28 +221,46 @@ export function DynamicMasterPage() {
           <p className="text-sm text-gray-500">Define the data fields for this master. Changes will affect the form and the table.</p>
           <div className="space-y-2">
             {schemaFields.map((field, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <GripVertical className="text-gray-400 cursor-move" />
-                <div className="flex-1 grid grid-cols-4 gap-2">
-                  <Input placeholder="Label (e.g. Price)" value={field.label} onChange={(e) => updateSchemaField(index, { label: e.target.value })} />
-                  <Input placeholder="Key (e.g. price)" value={field.key} onChange={(e) => updateSchemaField(index, { key: e.target.value })} />
-                  <Select 
-                    value={field.dataType} 
-                    onChange={(e) => updateSchemaField(index, { dataType: e.target.value })}
-                    options={[
-                      { value: "string", label: "Short Answer" },
-                      { value: "number", label: "Number" },
-                      { value: "paragraph", label: "Paragraph" },
-                      { value: "dropdown", label: "Drop-down" },
-                      { value: "date", label: "Date" },
-                    ]}
-                  />
-                  <div className="flex items-center gap-2 px-2">
-                    <input type="checkbox" checked={field.validationRules?.required} onChange={(e) => updateSchemaField(index, { validationRules: { ...field.validationRules, required: e.target.checked } })} />
-                    <span className="text-sm">Required</span>
+              <div key={index} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-3 w-full">
+                  <GripVertical className="text-gray-400 cursor-move" />
+                  <div className="flex-1 grid grid-cols-4 gap-2">
+                    <Input placeholder="Label (e.g. Price)" value={field.label} onChange={(e) => updateSchemaField(index, { label: e.target.value })} />
+                    <Input placeholder="Key (e.g. price)" value={field.key} onChange={(e) => updateSchemaField(index, { key: e.target.value })} />
+                    <Select 
+                      value={field.dataType} 
+                      onChange={(e) => updateSchemaField(index, { dataType: e.target.value })}
+                      options={[
+                        { value: "string", label: "Short Answer" },
+                        { value: "number", label: "Number" },
+                        { value: "paragraph", label: "Paragraph" },
+                        { value: "dropdown", label: "Drop-down" },
+                        { value: "date", label: "Date" },
+                      ]}
+                    />
+                    <div className="flex items-center gap-2 px-2">
+                      <input type="checkbox" checked={field.validationRules?.required} onChange={(e) => updateSchemaField(index, { validationRules: { ...field.validationRules, required: e.target.checked } })} />
+                      <span className="text-sm">Required</span>
+                    </div>
                   </div>
+                  <button onClick={() => removeSchemaField(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                 </div>
-                <button onClick={() => removeSchemaField(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                {field.dataType === "dropdown" && (
+                  <div className="pl-8 pr-10 flex items-center gap-3 w-full">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-36 shrink-0">Dropdown Options:</span>
+                    <Input 
+                      placeholder="Enter options separated by commas (e.g. Feed, Medicine, Equipment, Chicks, General)" 
+                      value={field.options?.join(",") || ""} 
+                      onChange={(e) => updateSchemaField(index, { 
+                        options: e.target.value.split(",") 
+                      })}
+                      onBlur={(e) => updateSchemaField(index, { 
+                        options: e.target.value.split(",").map(s => s.trim()).filter(s => s.length > 0) 
+                      })}
+                      className="flex-1 h-9 text-xs rounded-lg"
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
