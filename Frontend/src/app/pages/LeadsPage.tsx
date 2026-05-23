@@ -1150,61 +1150,84 @@ export function LeadsPage() {
 
           importedSignatures.add(signature);
 
+          let mappedStatus = "OPEN";
+          const rawStatus = (leadObj.status || "").toUpperCase().replace(/\s+/g, '_');
+          if (["OPEN", "IN_PROGRESS", "WON", "LOST"].includes(rawStatus)) {
+             mappedStatus = rawStatus;
+          } else if (rawStatus === "INPROGRESS") {
+             mappedStatus = "IN_PROGRESS";
+          } else if (rawStatus.includes("WON") || rawStatus.includes("CLOSED") || rawStatus === "SALE" || rawStatus === "INVOICE") {
+             mappedStatus = "WON";
+          }
+
+          let mappedSource = "OTHER";
+          const rawSource = (leadObj.source || "").toUpperCase().replace(/\s+/g, '_');
+          if (["META_ADS", "GOOGLE_ADS", "REFERRAL", "WEBSITE", "OTHER"].includes(rawSource)) {
+             mappedSource = rawSource;
+          } else if (rawSource === "FACEBOOK" || rawSource === "INSTAGRAM") {
+             mappedSource = "META_ADS";
+          }
+          
+          let validEmail = undefined;
+          if (leadObj.email && typeof leadObj.email === 'string' && leadObj.email.includes('@')) {
+             validEmail = leadObj.email;
+          }
+
           const payload = {
-            status: leadObj.status || "OPEN",
-            source: leadObj.source || "OTHER",
-            notes: leadObj.notes || "",
-            customerName: leadObj.customerName,
-            email: leadObj.email || undefined,
-            mobileNumber: leadObj.mobileNumber || "",
-            alternateMobile: leadObj.alternateMobile || "",
-            companyName: leadObj.companyName || "",
-            gstNumber: leadObj.gstNumber || "",
-            address: leadObj.address || "",
-            city: leadObj.city || "",
-            state: leadObj.state || "",
-            country: leadObj.country || "",
-            pincode: leadObj.pincode || "",
-            customerType: leadObj.customerType || "Retail",
-            contactPerson: leadObj.contactPerson || "",
-            productName: leadObj.productName || "Product",
-            productCode: leadObj.productCode || "",
-            category: leadObj.category || "General",
-            brand: leadObj.brand || "",
-            unit: leadObj.unit || "",
-            price: leadObj.price || 0,
-            tax: leadObj.tax || 0,
-            stockQuantity: leadObj.stockQuantity || 0,
-            description: leadObj.description || "",
+            status: mappedStatus,
+            source: mappedSource,
+            notes: String(leadObj.notes || ""),
+            customerName: String(leadObj.customerName || ""),
+            email: validEmail,
+            mobileNumber: String(leadObj.mobileNumber || ""),
+            alternateMobile: String(leadObj.alternateMobile || ""),
+            companyName: String(leadObj.companyName || ""),
+            gstNumber: String(leadObj.gstNumber || ""),
+            address: String(leadObj.address || ""),
+            city: String(leadObj.city || ""),
+            state: String(leadObj.state || ""),
+            country: String(leadObj.country || ""),
+            pincode: String(leadObj.pincode || ""),
+            customerType: String(leadObj.customerType || "Retail"),
+            contactPerson: String(leadObj.contactPerson || ""),
+            productName: String(leadObj.productName || "Product"),
+            productCode: String(leadObj.productCode || ""),
+            category: String(leadObj.category || "General"),
+            brand: String(leadObj.brand || ""),
+            unit: String(leadObj.unit || ""),
+            price: Number(leadObj.price) || 0,
+            tax: Number(leadObj.tax) || 0,
+            stockQuantity: Number(leadObj.stockQuantity) || 0,
+            description: String(leadObj.description || ""),
             customerData: {
-              name: leadObj.customerName,
-              phone: leadObj.mobileNumber || "",
-              type: leadObj.customerType || "Retail",
-              noOfCattle: leadObj.noOfCattle || "",
-              monthlyUsing: leadObj.monthlyUsing || "",
-              needQty: leadObj.needQty || "",
-              villaage: leadObj.city || "",
-              taluka: leadObj.state || "",
-              district: leadObj.country || "",
-              distance: leadObj.distance || ""
+              name: String(leadObj.customerName || ""),
+              phone: String(leadObj.mobileNumber || ""),
+              type: String(leadObj.customerType || "Retail"),
+              noOfCattle: String(leadObj.noOfCattle || ""),
+              monthlyUsing: String(leadObj.monthlyUsing || ""),
+              needQty: String(leadObj.needQty || ""),
+              villaage: String(leadObj.city || ""),
+              taluka: String(leadObj.state || ""),
+              district: String(leadObj.country || ""),
+              distance: String(leadObj.distance || "")
             },
             leadData: {
-              notes: leadObj.notes || "",
+              notes: String(leadObj.notes || ""),
               vehicleType: "Other",
-              noOfCattle: leadObj.noOfCattle || "",
-              monthlyUsing: leadObj.monthlyUsing || "",
-              needQty: leadObj.needQty || "",
-              followupDate: leadObj.followupDate || "",
+              noOfCattle: String(leadObj.noOfCattle || ""),
+              monthlyUsing: String(leadObj.monthlyUsing || ""),
+              needQty: String(leadObj.needQty || ""),
+              followupDate: String(leadObj.followupDate || ""),
             },
             productData: {
               selectedProducts: [{
-                name: leadObj.productName || "Product",
-                price: leadObj.price || 0,
-                tax: leadObj.tax || 0,
-                qty: leadObj.stockQuantity || 1,
-                category: leadObj.category || "General",
-                description: leadObj.description || "",
-                afterDiscountPrice: (leadObj.price || 0) * (leadObj.stockQuantity || 1)
+                name: String(leadObj.productName || "Product"),
+                price: Number(leadObj.price) || 0,
+                tax: Number(leadObj.tax) || 0,
+                qty: Number(leadObj.stockQuantity) || 1,
+                category: String(leadObj.category || "General"),
+                description: String(leadObj.description || ""),
+                afterDiscountPrice: (Number(leadObj.price) || 0) * (Number(leadObj.stockQuantity) || 1)
               }]
             }
           };
