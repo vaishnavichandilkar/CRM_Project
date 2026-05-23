@@ -13,6 +13,7 @@ import { salesService } from "../../services/sales.service";
 export function SalesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"fresh" | "resale">("fresh");
+  const [pipelineFilter, setPipelineFilter] = useState<string | null>(null);
   const [salesList, setSalesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,8 +40,8 @@ export function SalesPage() {
       
       const leads = await leadsService.getAllLeads();
       setFunnelStats({
-        leads: leads.length,
-        opps: leads.filter((l: any) => l.status === 'IN_PROGRESS' || l.status === 'In Progress').length
+        leads: leads.filter((l: any) => l.status === 'OPEN' || l.status === 'Open').length,
+        opps: leads.filter((l: any) => l.status === 'IN_PROGRESS' || l.status === 'In Progress' || l.status === 'OPPORTUNITY').length
       });
       const wonLeads = leads.filter((l: any) => l.isConverted === true || l.status === 'WON' || l.status === 'Won' || l.status === 'WON/CLOSED');
 
@@ -113,9 +114,12 @@ export function SalesPage() {
     }
   };
 
-  const filteredData = salesList.filter(sale =>
-    activeTab === "fresh" ? sale.type === "Fresh" : sale.type === "Resale"
-  );
+  const filteredData = salesList.filter(sale => {
+    const tabMatch = activeTab === "fresh" ? sale.type === "Fresh" : sale.type === "Resale";
+    if (!tabMatch) return false;
+    if (pipelineFilter) return sale.status === pipelineFilter;
+    return true;
+  });
 
   const columns = [
     { key: "customer", label: "Customer Name", sortable: true, render: (val: string) => <span className="font-semibold text-slate-800">{val}</span> },
@@ -214,33 +218,45 @@ export function SalesPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 py-6 bg-slate-50/50 rounded-2xl border border-slate-100">
-            <div className="flex flex-col items-center">
-              <div className="w-14 h-14 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
+            <button 
+              onClick={() => navigate('/leads', { state: { filter: 'ALL' } })}
+              className="flex flex-col items-center cursor-pointer hover:scale-105 transition-transform group"
+            >
+              <div className="w-14 h-14 bg-indigo-50 border border-indigo-100 group-hover:border-indigo-300 rounded-full flex items-center justify-center mb-1 shadow-sm">
                 <span className="text-lg font-extrabold text-indigo-700">{funnelStats.leads}</span>
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Leads</span>
-            </div>
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-indigo-600 uppercase tracking-wider">Leads</span>
+            </button>
             <ArrowRight className="w-5 h-5 text-slate-300" />
-            <div className="flex flex-col items-center">
-              <div className="w-14 h-14 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
+            <button 
+              onClick={() => navigate('/leads', { state: { filter: 'ACTIVE_PIPELINE' } })}
+              className="flex flex-col items-center cursor-pointer hover:scale-105 transition-transform group"
+            >
+              <div className="w-14 h-14 bg-orange-50 border border-orange-100 group-hover:border-orange-300 rounded-full flex items-center justify-center mb-1 shadow-sm">
                 <span className="text-lg font-extrabold text-orange-700">{funnelStats.opps}</span>
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Opp.</span>
-            </div>
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-orange-600 uppercase tracking-wider">Opp.</span>
+            </button>
             <ArrowRight className="w-5 h-5 text-slate-300" />
-            <div className="flex flex-col items-center">
-              <div className="w-14 h-14 bg-emerald-50 border border-emerald-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
-                <span className="text-lg font-extrabold text-emerald-700">{salesList.length}</span>
+            <button 
+              onClick={() => setPipelineFilter(prev => prev === 'Sale' ? null : 'Sale')}
+              className="flex flex-col items-center cursor-pointer hover:scale-105 transition-transform group"
+            >
+              <div className={`w-14 h-14 bg-emerald-50 border ${pipelineFilter === 'Sale' ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-emerald-100 group-hover:border-emerald-300'} rounded-full flex items-center justify-center mb-1 shadow-sm transition-all`}>
+                <span className="text-lg font-extrabold text-emerald-700">{salesList.filter(s => s.status === 'Sale').length}</span>
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Orders</span>
-            </div>
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${pipelineFilter === 'Sale' ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600'}`}>Orders</span>
+            </button>
             <ArrowRight className="w-5 h-5 text-slate-300" />
-            <div className="flex flex-col items-center">
-              <div className="w-14 h-14 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center mb-1 shadow-sm">
+            <button 
+              onClick={() => setPipelineFilter(prev => prev === 'Invoice' ? null : 'Invoice')}
+              className="flex flex-col items-center cursor-pointer hover:scale-105 transition-transform group"
+            >
+              <div className={`w-14 h-14 bg-blue-50 border ${pipelineFilter === 'Invoice' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-100 group-hover:border-blue-300'} rounded-full flex items-center justify-center mb-1 shadow-sm transition-all`}>
                 <span className="text-lg font-extrabold text-blue-700">{salesList.filter(s => s.status === 'Invoice').length}</span>
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Invoiced</span>
-            </div>
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${pipelineFilter === 'Invoice' ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`}>Invoiced</span>
+            </button>
           </div>
         </CardContent>
       </Card>
