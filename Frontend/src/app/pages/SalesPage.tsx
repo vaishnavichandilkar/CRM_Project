@@ -14,6 +14,7 @@ export function SalesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"fresh" | "resale">("fresh");
   const [pipelineFilter, setPipelineFilter] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<"all" | "weekly" | "monthly" | "quarterly">("all");
   const [salesList, setSalesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,29 +46,74 @@ export function SalesPage() {
       });
       const wonLeads = leads.filter((l: any) => l.isConverted === true || l.status === 'WON' || l.status === 'Won' || l.status === 'WON/CLOSED');
 
-      const mapped = wonLeads.map((l: any) => ({
-        id: l.id,
-        customer: l.customerName || "Unnamed Customer",
-        product: l.productName || "Product",
-        amount: (l.price || 0) * (l.stockQuantity || 1),
-        status: "Sale",
-        type: "Fresh",
-        date: new Date(l.createdAt).toISOString().split('T')[0],
-        resaleCount: 0,
-        lead: l,
-      }));
 
       const backendSales = await salesService.getSalesData();
-      const mappedBackendSales = backendSales.map((s: any) => ({
-        id: s.id,
-        customer: s.customer?.name || "Unnamed Customer",
-        product: s.product?.name || "Product",
-        amount: s.amount,
-        status: s.status,
-        type: s.purchaseCount > 1 ? "Resale" : "Fresh",
-        date: new Date(s.createdAt).toISOString().split('T')[0],
-        resaleCount: s.purchaseCount > 1 ? s.purchaseCount : 0,
-      }));
+      
+      // Calculate frequency per customer using BOTH wonLeads and backendSales
+      const customerSalesMap = new Map<string, Date[]>();
+      
+      wonLeads.forEach((l: any) => {
+         const cName = l.customerName || "Unnamed Customer";
+         if (!customerSalesMap.has(cName)) customerSalesMap.set(cName, []);
+         customerSalesMap.get(cName)!.push(new Date(l.createdAt));
+      });
+      
+      backendSales.forEach((s: any) => {
+         const cName = s.customer?.name || "Unnamed Customer";
+         if (!customerSalesMap.has(cName)) customerSalesMap.set(cName, []);
+         customerSalesMap.get(cName)!.push(new Date(s.createdAt));
+      });
+      
+      const frequencyMap = new Map<string, string>();
+      customerSalesMap.forEach((dates, cName) => {
+         if (dates.length < 2) {
+            frequencyMap.set(cName, "First Time");
+         } else {
+            dates.sort((a, b) => a.getTime() - b.getTime());
+            let totalDiff = 0;
+            for (let i = 1; i < dates.length; i++) {
+               totalDiff += dates[i].getTime() - dates[i-1].getTime();
+            }
+            const avgDiffDays = (totalDiff / (dates.length - 1)) / (1000 * 3600 * 24);
+            if (avgDiffDays <= 10) frequencyMap.set(cName, "Weekly");
+            else if (avgDiffDays <= 45) frequencyMap.set(cName, "Monthly");
+            else if (avgDiffDays <= 120) frequencyMap.set(cName, "Quarterly");
+            else frequencyMap.set(cName, "Yearly");
+         }
+      });
+
+      const mapped = wonLeads.map((l: any) => {
+        const cName = l.customerName || "Unnamed Customer";
+        const purchaseCount = customerSalesMap.get(cName)?.length || 1;
+        return {
+          id: l.id,
+          customer: cName,
+          product: l.productName || "Product",
+          amount: (l.price || 0) * (l.stockQuantity || 1),
+          status: "Sale",
+          type: purchaseCount > 1 ? "Resale" : "Fresh",
+          date: new Date(l.createdAt).toISOString().split('T')[0],
+          resaleCount: purchaseCount > 1 ? purchaseCount : 0,
+          frequency: frequencyMap.get(cName) || "First Time",
+          lead: l,
+        };
+      });
+
+      const mappedBackendSales = backendSales.map((s: any) => {
+        const cName = s.customer?.name || "Unnamed Customer";
+        const purchaseCount = customerSalesMap.get(cName)?.length || 1;
+        return {
+          id: s.id,
+          customer: cName,
+          product: s.product?.name || "Product",
+          amount: s.amount,
+          status: s.status,
+          type: purchaseCount > 1 ? "Resale" : "Fresh",
+          date: new Date(s.createdAt).toISOString().split('T')[0],
+          resaleCount: purchaseCount > 1 ? purchaseCount : 0,
+          frequency: frequencyMap.get(cName) || "First Time"
+        };
+      });
 
       setSalesList([...mapped, ...mappedBackendSales]);
     } catch (err) {
@@ -117,7 +163,25 @@ export function SalesPage() {
   const filteredData = salesList.filter(sale => {
     const tabMatch = activeTab === "fresh" ? sale.type === "Fresh" : sale.type === "Resale";
     if (!tabMatch) return false;
-    if (pipelineFilter) return sale.status === pipelineFilter;
+    if (pipelineFilter) {
+       if (sale.status !== pipelineFilter) return false;
+    }
+    
+    if (timeFilter !== "all") {
+       const saleDate = new Date(sale.date);
+       const now = new Date();
+       if (timeFilter === "weekly") {
+         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+         if (saleDate < oneWeekAgo) return false;
+       } else if (timeFilter === "monthly") {
+         const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+         if (saleDate < oneMonthAgo) return false;
+       } else if (timeFilter === "quarterly") {
+         const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+         if (saleDate < threeMonthsAgo) return false;
+       }
+    }
+    
     return true;
   });
 
@@ -143,11 +207,29 @@ export function SalesPage() {
         return <Badge variant={variant} className="rounded-lg font-bold tracking-tight text-[10px] uppercase">{value}</Badge>;
       },
     },
-    ...(activeTab === "resale" ? [{
-      key: "resaleCount",
-      label: "Purchase History",
-      render: (value: number) => <Badge variant="info" className="font-bold">{value}x Purchase</Badge>,
-    }] : []),
+    ...(activeTab === "resale" ? [
+      {
+        key: "resaleCount",
+        label: "Purchase History",
+        render: (value: number) => <Badge variant="info" className="font-bold">{value}x Purchase</Badge>,
+      },
+      {
+        key: "frequency",
+        label: "Frequency",
+        render: (value: string) => {
+          let color = "text-slate-500 bg-slate-100";
+          if (value === "Weekly") color = "text-indigo-600 bg-indigo-50 border-indigo-200";
+          else if (value === "Monthly") color = "text-emerald-600 bg-emerald-50 border-emerald-200";
+          else if (value === "Quarterly") color = "text-orange-600 bg-orange-50 border-orange-200";
+          
+          return (
+            <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${color}`}>
+              {value}
+            </span>
+          );
+        }
+      }
+    ] : []),
     { key: "date", label: "Closed Date", sortable: true },
     {
       key: "actions",
@@ -287,13 +369,25 @@ export function SalesPage() {
 
       {/* Sales Pipeline List */}
       <Card className="border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] rounded-2xl overflow-hidden bg-white">
-        <CardHeader className="px-8 py-5 border-b border-slate-100/80 bg-slate-50/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <CardHeader className="px-8 py-5 border-b border-slate-100/80 bg-slate-50/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <CardTitle className="text-sm font-bold text-slate-800">
             {activeTab === "fresh" ? "Fresh Sales Pipeline (Won CRM Leads)" : "Loyal / Resale Customer Transactions"}
           </CardTitle>
-          <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-3 py-1 rounded-full uppercase self-start sm:self-auto">
-            Active Accounts
-          </span>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as any)}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+            >
+              <option value="all">All Time</option>
+              <option value="weekly">This Week</option>
+              <option value="monthly">This Month</option>
+              <option value="quarterly">This Quarter</option>
+            </select>
+            <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-3 py-1 rounded-full uppercase">
+              Active Accounts
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
