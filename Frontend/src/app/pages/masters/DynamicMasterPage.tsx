@@ -19,6 +19,8 @@ export function DynamicMasterPage() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewData, setViewData] = useState<Record<string, any> | null>(null);
   
   // For schema management
   const [schemaFields, setSchemaFields] = useState<any[]>([]);
@@ -113,6 +115,11 @@ export function DynamicMasterPage() {
     setModalOpen(true);
   };
 
+  const handleView = (row: any) => {
+    setViewData(row);
+    setViewModalOpen(true);
+  };
+
   const handleDelete = async (row: any) => {
     if (window.confirm("Are you sure you want to delete this record?")) {
       try {
@@ -170,6 +177,7 @@ export function DynamicMasterPage() {
             columns={columns}
             data={records}
             onEdit={handleEdit}
+            onView={handleView}
             onDelete={handleDelete}
             searchPlaceholder={`Search ${config.name.toLowerCase()}...`}
           />
@@ -273,6 +281,32 @@ export function DynamicMasterPage() {
           <Button variant="primary" onClick={handleSaveSchema} disabled={isSaving}>
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* View Record Modal */}
+      <Modal
+        isOpen={viewModalOpen}
+        onClose={() => { setViewModalOpen(false); setViewData(null); }}
+        title={`${config.name} Details`}
+        size="md"
+      >
+        <div className="space-y-4">
+          {viewData && config.config.map((field) => (
+            <div key={field.key} className="flex flex-col gap-1 border-b pb-3">
+              <span className="text-sm font-semibold text-gray-500 uppercase">{field.label}</span>
+              <span className="text-base text-gray-900">
+                {field.dataType === 'date' && viewData[field.key]
+                  ? new Date(viewData[field.key]).toLocaleDateString()
+                  : Array.isArray(viewData[field.key])
+                  ? viewData[field.key].join(', ')
+                  : (viewData[field.key]?.toString() || '—')}
+              </span>
+            </div>
+          ))}
+        </div>
+        <ModalFooter>
+          <Button variant="primary" onClick={() => { setViewModalOpen(false); setViewData(null); }}>Close</Button>
         </ModalFooter>
       </Modal>
     </div>

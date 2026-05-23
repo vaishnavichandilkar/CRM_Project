@@ -79,6 +79,8 @@ export class ProductsService {
         sku: data.sku || `PRD${String(r.id).padStart(3, '0')}`,
         name: data.name || '',
         price: Number(data.customerRate || data.dealerRate || data.price) || 0,
+        customerRate: Number(data.customerRate) || 0,
+        dealerRate: Number(data.dealerRate) || 0,
         quantity: data.quantity || '',
       };
     });

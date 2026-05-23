@@ -39,7 +39,7 @@ export class SalesService {
   async getSalesMetadata() {
     // Fetch customers
     const customersRecords = await this.prisma.masterData.findMany({
-      where: { masterConfig: { slug: 'customers' } },
+      where: { masterConfig: { slug: { in: ['customers', 'dealers'] } } },
     });
     const customers = customersRecords.map(r => ({
       id: r.id,

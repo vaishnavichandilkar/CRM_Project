@@ -40,12 +40,13 @@ export class CustomersService {
     const records = await this.prisma.masterData.findMany({
       where: {
         masterConfig: {
-          slug: 'customers',
+          slug: { in: ['customers', 'dealers'] },
         },
       },
       select: {
         id: true,
         data: true,
+        masterConfig: { select: { slug: true } },
       },
     });
 
@@ -56,6 +57,7 @@ export class CustomersService {
         customerCode: data.customerCode || `CUST${String(r.id).padStart(3, '0')}`,
         name: data.name || '',
         phone: data.phone || '',
+        type: data.type || (r.masterConfig?.slug === 'dealers' ? 'Wholesale/Dealer' : 'Retail'),
       };
     });
   }
@@ -65,15 +67,20 @@ export class CustomersService {
       where: {
         id,
         masterConfig: {
-          slug: 'customers',
+          slug: { in: ['customers', 'dealers'] },
         },
       },
+      include: {
+        masterConfig: true
+      }
     });
 
     if (record) {
+      const data = record.data as any;
       return {
         id: record.id,
-        ...(record.data as object),
+        type: data.type || (record.masterConfig?.slug === 'dealers' ? 'Wholesale/Dealer' : 'Retail'),
+        ...data,
       };
     }
 

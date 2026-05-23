@@ -103,7 +103,7 @@ export const leadsService = {
   },
 
   getCustomersDropdown: async () => {
-    const response = await api.get<{ id: number; customerCode: string; name: string; phone: string }[]>('/customers/dropdown');
+    const response = await api.get<{ id: number; customerCode: string; name: string; phone: string; type?: string }[]>('/customers/dropdown');
     return response.data;
   },
 
@@ -113,7 +113,7 @@ export const leadsService = {
   },
 
   getProductsDropdown: async () => {
-    const response = await api.get<{ id: number; sku: string; name: string }[]>('/products/dropdown');
+    const response = await api.get<{ id: number; sku: string; name: string; price: number; customerRate: number; dealerRate: number; quantity: string }[]>('/products/dropdown');
     return response.data;
   },
 

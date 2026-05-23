@@ -301,7 +301,21 @@ export function SalesPage() {
               label="Customer Name"
               required
               value={formData.customer}
-              onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+              onChange={(e) => {
+                const newCustomerName = e.target.value;
+                const selectedCustomer = customers.find(c => c.name === newCustomerName);
+                const isDealer = selectedCustomer?.type?.toLowerCase().includes('dealer') || selectedCustomer?.type?.toLowerCase().includes('wholesale');
+                
+                let newAmount = formData.amount;
+                if (formData.product) {
+                   const prod = products.find(p => p.name === formData.product);
+                   if (prod) {
+                      newAmount = (isDealer && prod.dealerRate ? prod.dealerRate : (prod.customerRate || prod.price || 0)).toString();
+                   }
+                }
+                
+                setFormData({ ...formData, customer: newCustomerName, amount: newAmount });
+              }}
               options={[
                 { value: "", label: "Select Customer..." },
                 ...customers.map(c => ({ value: c.name, label: c.name }))
@@ -314,7 +328,9 @@ export function SalesPage() {
               onChange={(e) => {
                 const selectedProdName = e.target.value;
                 const prod = products.find(p => p.name === selectedProdName);
-                const price = prod ? (prod.price || 0) : 0;
+                const selectedCustomer = customers.find(c => c.name === formData.customer);
+                const isDealer = selectedCustomer?.type?.toLowerCase().includes('dealer') || selectedCustomer?.type?.toLowerCase().includes('wholesale');
+                const price = prod ? (isDealer && prod.dealerRate ? prod.dealerRate : (prod.customerRate || prod.price || 0)) : 0;
                 setFormData({ 
                   ...formData, 
                   product: selectedProdName,

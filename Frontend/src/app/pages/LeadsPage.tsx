@@ -419,6 +419,28 @@ export function LeadsPage() {
   const handleCustomerSelect = async (id: number) => {
     try {
       const details = await leadsService.getCustomerDetails(id);
+      const newCustType = (details.type || "Retail").toLowerCase();
+      
+      setSelectedProducts(prevProducts => prevProducts.map(p => {
+        let newPrice = p.price;
+        const pDetails = p.productData || {};
+        if (newCustType.includes('dealer') || newCustType.includes('wholesale')) {
+          const dealerRate = pDetails.productData?.dealerRate || pDetails.productData?.['Dealer Rate'] || pDetails.dealerRate;
+          if (dealerRate) newPrice = parseFloat(dealerRate);
+        } else {
+          const customerRate = pDetails.productData?.customerRate || pDetails.productData?.['Customer Rate'] || pDetails.customerRate;
+          if (customerRate) newPrice = parseFloat(customerRate);
+        }
+        
+        const qty = p.qty || 1;
+        const discountAmount = p.discountAmount || 0;
+        return {
+          ...p,
+          price: newPrice,
+          afterDiscountPrice: (newPrice * qty) - discountAmount
+        };
+      }));
+
       setFormData(prev => ({
         ...prev,
         customerId: id,

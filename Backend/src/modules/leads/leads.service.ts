@@ -17,8 +17,13 @@ export class LeadsService {
     let finalCustomerId = customerId;
 
     if (!finalCustomerId && (dto.customerName || dto.email || dto.mobileNumber || rawDto.phone || dto.customerData?.name || dto.customerData?.email || dto.customerData?.phone || dto.customerData?.mobileNumber)) {
+      
+      const custType = (dto.customerData?.type || dto.customerType || rawDto.type || 'Retail').toLowerCase();
+      const isDealer = custType.includes('dealer') || custType.includes('wholesale');
+      const targetSlug = isDealer ? 'dealers' : 'customers';
+
       const customerConfig = await this.prisma.masterConfig.findUnique({
-        where: { slug: 'customers' },
+        where: { slug: targetSlug },
       });
 
       if (customerConfig) {
@@ -66,7 +71,11 @@ export class LeadsService {
             }
           }
 
-          if (!newCustomerData.customerCode) {
+          if (isDealer) {
+            newCustomerData.contactPerson = nameToCheck; // fallback
+          }
+
+          if (!newCustomerData.customerCode && !isDealer) {
             const currentCustomerRecordsCount = await this.prisma.masterData.count({
               where: { masterConfigId: customerConfig.id }
             });
@@ -90,25 +99,36 @@ export class LeadsService {
             const rawType = (newCustomerData.type || 'Retail').toUpperCase();
             const validCustomerType = ['RETAIL', 'WHOLESALE'].includes(rawType) ? rawType : 'RETAIL';
 
-            const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
-              ? newCustomerData.email.trim().toLowerCase() 
-              : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
-
-            const existingStatic = await this.prisma.customer.findUnique({
-              where: { email: uniqueEmail }
-            });
-
-            if (!existingStatic) {
-              await this.prisma.customer.create({
+            if (isDealer) {
+              await this.prisma.dealer.create({
                 data: {
                   name: newCustomerData.name,
-                  email: uniqueEmail,
+                  contactPerson: newCustomerData.contactPerson || newCustomerData.name,
                   phone: newCustomerData.phone || '',
                   region: validRegion as any,
-                  type: validCustomerType as any,
-                  address: newCustomerData.address || '',
                 }
               });
+            } else {
+              const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
+                ? newCustomerData.email.trim().toLowerCase() 
+                : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
+
+              const existingStatic = await this.prisma.customer.findUnique({
+                where: { email: uniqueEmail }
+              });
+
+              if (!existingStatic) {
+                await this.prisma.customer.create({
+                  data: {
+                    name: newCustomerData.name,
+                    email: uniqueEmail,
+                    phone: newCustomerData.phone || '',
+                    region: validRegion as any,
+                    type: validCustomerType as any,
+                    address: newCustomerData.address || '',
+                  }
+                });
+              }
             }
           } catch (err) {
             console.error("Failed to sync to static Customer model:", err);
@@ -176,11 +196,17 @@ export class LeadsService {
     const oldStatus = lead.status;
     const newStatus = status || oldStatus;
 
+    const rawDto = dto as any;
     let finalCustomerId = customerId;
 
     if (!finalCustomerId && (dto.customerName || dto.email || dto.mobileNumber || dto.phone || dto.customerData?.name || dto.customerData?.email || dto.customerData?.phone || dto.customerData?.mobileNumber)) {
+      
+      const custType = (dto.customerData?.type || dto.customerType || rawDto.type || 'Retail').toLowerCase();
+      const isDealer = custType.includes('dealer') || custType.includes('wholesale');
+      const targetSlug = isDealer ? 'dealers' : 'customers';
+
       const customerConfig = await this.prisma.masterConfig.findUnique({
-        where: { slug: 'customers' },
+        where: { slug: targetSlug },
       });
 
       if (customerConfig) {
@@ -189,7 +215,7 @@ export class LeadsService {
         });
 
         const emailToCheck = dto.email?.trim() || dto.customerData?.email?.trim();
-        const phoneToCheck = dto.mobileNumber?.trim() || dto.customerData?.phone?.trim() || dto.phone?.trim() || dto.customerData?.mobileNumber?.trim();
+        const phoneToCheck = dto.mobileNumber?.trim() || dto.customerData?.phone?.trim() || rawDto.phone?.trim() || dto.customerData?.mobileNumber?.trim();
         const nameToCheck = dto.customerName?.trim() || dto.customerData?.name?.trim();
 
         const matchedCustomer = existingCustomers.find((c: any) => {
@@ -215,8 +241,8 @@ export class LeadsService {
             name: nameToCheck,
             email: emailToCheck || '',
             phone: phoneToCheck || '',
-            region: dto.customerData?.region || dto.region || 'North',
-            type: dto.customerData?.type || dto.customerType || dto.type || 'Retail',
+            region: dto.customerData?.region || rawDto.region || 'North',
+            type: dto.customerData?.type || dto.customerType || rawDto.type || 'Retail',
             address: dto.address || dto.customerData?.address || '',
           };
 
@@ -228,7 +254,11 @@ export class LeadsService {
             }
           }
 
-          if (!newCustomerData.customerCode) {
+          if (isDealer) {
+            newCustomerData.contactPerson = nameToCheck; // fallback
+          }
+
+          if (!newCustomerData.customerCode && !isDealer) {
             const currentCustomerRecordsCount = await this.prisma.masterData.count({
               where: { masterConfigId: customerConfig.id }
             });
@@ -252,25 +282,36 @@ export class LeadsService {
             const rawType = (newCustomerData.type || 'Retail').toUpperCase();
             const validCustomerType = ['RETAIL', 'WHOLESALE'].includes(rawType) ? rawType : 'RETAIL';
 
-            const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
-              ? newCustomerData.email.trim().toLowerCase() 
-              : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
-
-            const existingStatic = await this.prisma.customer.findUnique({
-              where: { email: uniqueEmail }
-            });
-
-            if (!existingStatic) {
-              await this.prisma.customer.create({
+            if (isDealer) {
+              await this.prisma.dealer.create({
                 data: {
                   name: newCustomerData.name,
-                  email: uniqueEmail,
+                  contactPerson: newCustomerData.contactPerson || newCustomerData.name,
                   phone: newCustomerData.phone || '',
                   region: validRegion as any,
-                  type: validCustomerType as any,
-                  address: newCustomerData.address || '',
                 }
               });
+            } else {
+              const uniqueEmail = newCustomerData.email && newCustomerData.email.trim() !== '' 
+                ? newCustomerData.email.trim().toLowerCase() 
+                : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}@example.com`;
+
+              const existingStatic = await this.prisma.customer.findUnique({
+                where: { email: uniqueEmail }
+              });
+
+              if (!existingStatic) {
+                await this.prisma.customer.create({
+                  data: {
+                    name: newCustomerData.name,
+                    email: uniqueEmail,
+                    phone: newCustomerData.phone || '',
+                    region: validRegion as any,
+                    type: validCustomerType as any,
+                    address: newCustomerData.address || '',
+                  }
+                });
+              }
             }
           } catch (err) {
             console.error("Failed to sync to static Customer model:", err);
