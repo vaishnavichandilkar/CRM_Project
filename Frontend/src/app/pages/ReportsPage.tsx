@@ -35,17 +35,17 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
           <p className="text-gray-600 mt-1">Comprehensive business intelligence and insights</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button variant="secondary" className="flex-1 sm:flex-initial justify-center">
             <Calendar className="w-4 h-4 mr-2" />
             Date Range
           </Button>
-          <Button variant="primary">
+          <Button variant="primary" className="flex-1 sm:flex-initial justify-center">
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
@@ -78,6 +78,7 @@ export function ReportsPage() {
                 { value: "south", label: "South" },
                 { value: "east", label: "East" },
                 { value: "west", label: "West" },
+                { value: "central", label: "Central" },
               ]}
             />
             <Select
@@ -94,7 +95,7 @@ export function ReportsPage() {
       </Card>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex flex-wrap gap-2 border-b border-gray-200">
         {[
           { id: "sales", label: "Sales" },
           { id: "product", label: "Product" },

@@ -24,7 +24,7 @@ export async function seedProductsData(prisma: PrismaClient) {
     { name: 'Milkiyana', quantity: '5 Ltr', dealerRate: 700, customerRate: 910 },
     { name: 'Fat Plus', quantity: '300 gm', dealerRate: 200, customerRate: 260 },
     { name: 'Dugdh samrudhi sarki pend', quantity: '40kg', dealerRate: 1700, customerRate: 1750 },
-    { name: 'Murghas', quantity: 'kg', dealerRate: 7.1, customerRate: 7.5 },
+    { name: 'Murghas', quantity: '1 kg', dealerRate: 7.1, customerRate: 7.5 },
   ];
 
   // First, wipe all existing products to prevent duplicates during re-seeds

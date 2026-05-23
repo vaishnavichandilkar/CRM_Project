@@ -8,13 +8,16 @@ import { Modal, ModalFooter } from "../components/ui/Modal";
 import { Input, Select } from "../components/ui/Input";
 import { toast } from "sonner";
 import { authService } from "../../services/auth.service";
-import { usersRolesService, User, Role } from "../../services/users-roles.service";
+import { usersRolesService, User, Role, Permission } from "../../services/users-roles.service";
 
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [checkedPermissionIds, setCheckedPermissionIds] = useState<number[]>([]);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -28,17 +31,23 @@ export function UsersPage() {
   const [isRequestsLoading, setIsRequestsLoading] = useState(true);
 
   const currentUser = authService.getCurrentUser();
-  const isAdmin = currentUser?.role?.name === "Admin";
+  const userRoleName = currentUser?.role?.name || "";
+  const isAdmin = userRoleName === "Admin";
+  const isManager = userRoleName === "Manager";
+
+  const canEditPermissions = isAdmin || (isManager && selectedRole && selectedRole.name !== "Admin");
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [usersData, rolesData] = await Promise.all([
+      const [usersData, rolesData, permissionsData] = await Promise.all([
         usersRolesService.getUsers(),
-        usersRolesService.getRoles()
+        usersRolesService.getRoles(),
+        usersRolesService.getPermissions()
       ]);
       setUsers(usersData);
       setRoles(rolesData);
+      setAllPermissions(permissionsData);
     } catch (error) {
       toast.error("Failed to fetch users and roles");
     } finally {
@@ -65,6 +74,29 @@ export function UsersPage() {
       fetchRequests();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (selectedRole) {
+      setCheckedPermissionIds(selectedRole.permissions?.map(p => p.permission.id) || []);
+    } else {
+      setCheckedPermissionIds([]);
+    }
+  }, [selectedRole]);
+
+  const handleSavePermissions = async () => {
+    if (!selectedRole) return;
+    try {
+      setIsSavingPermissions(true);
+      await usersRolesService.updateRolePermissions(selectedRole.id, checkedPermissionIds);
+      toast.success(`${selectedRole.name} permissions updated successfully`);
+      setSelectedRole(null);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update permissions");
+    } finally {
+      setIsSavingPermissions(false);
+    }
+  };
 
   const handleApprove = async (id: string, email: string) => {
     try {
@@ -136,12 +168,6 @@ export function UsersPage() {
     },
   ];
 
-  const rolePermissions = {
-    Admin: ["Full Access", "User Management", "System Settings", "Reports", "Sales", "Leads"],
-    Manager: ["Reports", "Sales", "Leads", "Team Management", "Approvals"],
-    "Sales Rep": ["Leads", "Sales", "Visits", "Basic Reports"],
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -180,18 +206,24 @@ export function UsersPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                {(rolePermissions[role.name as keyof typeof rolePermissions] || []).map((perm, index) => (
+                {role.permissions?.map((p, index) => (
                   <div key={index} className="text-sm text-gray-600 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
-                    {perm}
+                    {p.permission.displayName}
                   </div>
                 ))}
+                {(!role.permissions || role.permissions.length === 0) && (
+                  <div className="text-sm text-gray-400 italic flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
+                    No permissions assigned
+                  </div>
+                )}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="w-full mt-4"
-                onClick={() => setSelectedRole(role.name)}
+                onClick={() => setSelectedRole(role)}
               >
                 View Details
               </Button>
@@ -286,7 +318,7 @@ export function UsersPage() {
         size="lg"
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               required
@@ -342,22 +374,50 @@ export function UsersPage() {
         <Modal
           isOpen={!!selectedRole}
           onClose={() => setSelectedRole(null)}
-          title={`${selectedRole} Permissions`}
+          title={`${selectedRole.name} Permissions`}
           size="md"
         >
-          <div className="space-y-3">
-            {rolePermissions[selectedRole as keyof typeof rolePermissions].map((perm, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <input type="checkbox" defaultChecked className="w-4 h-4" />
-                <span>{perm}</span>
-              </div>
-            ))}
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+            {allPermissions.map((perm) => {
+              const isChecked = checkedPermissionIds.includes(perm.id);
+              return (
+                <label 
+                  key={perm.id} 
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={isChecked}
+                    disabled={!canEditPermissions}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setCheckedPermissionIds([...checkedPermissionIds, perm.id]);
+                      } else {
+                        setCheckedPermissionIds(checkedPermissionIds.filter(id => id !== perm.id));
+                      }
+                    }} 
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">{perm.displayName}</span>
+                    <span className="text-xs text-gray-400 ml-2">({perm.name})</span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
           <ModalFooter>
             <Button variant="secondary" onClick={() => setSelectedRole(null)}>
-              Close
+              Cancel
             </Button>
-            <Button variant="primary">Save Changes</Button>
+            <Button 
+              variant="primary" 
+              onClick={handleSavePermissions}
+              isLoading={isSavingPermissions}
+              disabled={!canEditPermissions}
+            >
+              Save Changes
+            </Button>
           </ModalFooter>
         </Modal>
       )}

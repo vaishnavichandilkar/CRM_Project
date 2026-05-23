@@ -79,12 +79,12 @@ export function VisitsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Visits & Field Tracking</h1>
           <p className="text-gray-600 mt-1">Schedule and manage field visits</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} variant="primary">
+        <Button onClick={() => setIsModalOpen(true)} variant="primary" className="w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4 mr-2" />
           Schedule Visit
         </Button>
@@ -176,7 +176,7 @@ export function VisitsPage() {
         size="lg"
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Customer"
               required
@@ -226,7 +226,7 @@ export function VisitsPage() {
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Add any notes..."
-              className="col-span-2"
+              className="col-span-1 sm:col-span-2"
             />
           </div>
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, ParseIntPipe } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, ParseIntPipe, Request } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
@@ -23,14 +23,15 @@ export class RolesController {
   }
 
   @Patch(':id/permissions')
-  @Roles('Admin')
+  @Roles('Admin', 'Manager')
   @ApiOperation({ summary: 'Update permissions for a role' })
   @ApiResponse({ status: 200, description: 'Permissions updated successfully.' })
   @ApiResponse({ status: 404, description: 'Role not found.' })
   updatePermissions(
     @Param('id', ParseIntPipe) id: number,
+    @Request() req,
     @Body() dto: UpdateRolePermissionsDto,
   ) {
-    return this.rolesService.updatePermissions(id, dto);
+    return this.rolesService.updatePermissions(id, req.user.role, dto);
   }
 }

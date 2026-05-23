@@ -19,23 +19,21 @@ export async function seedMasters(prismaInstance: PrismaClient) {
       slug: 'customers',
       config: [
         { label: 'Customer Name', key: 'name', dataType: 'string', validationRules: { required: true } },
-        { label: 'Email', key: 'email', dataType: 'string', validationRules: { required: true } },
         { label: 'Phone', key: 'phone', dataType: 'string', validationRules: { required: true } },
-        { 
-          label: 'Region', 
-          key: 'region', 
-          dataType: 'dropdown', 
-          options: ['North', 'South', 'East', 'West'],
-          validationRules: { required: true } 
-        },
         { 
           label: 'Customer Type', 
           key: 'type', 
           dataType: 'dropdown', 
-          options: ['Retail', 'Wholesale'],
+          options: ['Retail/Customer', 'Wholesale/Dealer'],
           validationRules: { required: true } 
         },
-        { label: 'Address', key: 'address', dataType: 'paragraph' },
+        { label: 'No. of Cattle', key: 'noOfCattle', dataType: 'string', validationRules: { required: false } },
+        { label: 'Monthly Using', key: 'monthlyUsing', dataType: 'string', validationRules: { required: false } },
+        { label: 'Need QTY', key: 'needQty', dataType: 'string', validationRules: { required: false } },
+        { label: 'Village', key: 'villaage', dataType: 'string', validationRules: { required: false } },
+        { label: 'Taluka', key: 'taluka', dataType: 'string', validationRules: { required: false } },
+        { label: 'District', key: 'district', dataType: 'string', validationRules: { required: false } },
+        { label: 'Distance', key: 'distance', dataType: 'string', validationRules: { required: false } },
       ],
     },
     {
@@ -186,7 +184,7 @@ export async function seedMasters(prismaInstance: PrismaClient) {
         { label: 'Taluka', key: 'state', dataType: 'string', validationRules: { required: false } },
         { label: 'District', key: 'country', dataType: 'string', validationRules: { required: false } },
         { label: 'Pincode', key: 'pincode', dataType: 'string', validationRules: { required: false } },
-        { label: 'Customer Type', key: 'customerType', dataType: 'dropdown', options: ['Retail', 'Wholesale', 'Dealer'], validationRules: { required: false } },
+        { label: 'Customer Type', key: 'customerType', dataType: 'dropdown', options: ['Retail/Customer', 'Wholesale/Dealer'], validationRules: { required: false } },
         { label: 'Product Name', key: 'productName', dataType: 'string', validationRules: { required: false } },
         { label: 'Product SKU', key: 'productCode', dataType: 'string', validationRules: { required: false } },
         { label: 'Category', key: 'category', dataType: 'dropdown', options: ['General', 'Feed', 'Medicine', 'Equipment', 'Chicks'], validationRules: { required: false } },

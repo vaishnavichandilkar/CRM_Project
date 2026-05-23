@@ -22,13 +22,17 @@ export class RolesService {
     return this.prisma.permission.findMany();
   }
 
-  async updatePermissions(roleId: number, dto: UpdateRolePermissionsDto) {
+  async updatePermissions(roleId: number, userRole: string, dto: UpdateRolePermissionsDto) {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
     });
 
     if (!role) {
       throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    if (userRole === 'Manager' && role.name === 'Admin') {
+      throw new BadRequestException('Managers are not authorized to update Admin permissions.');
     }
 
     let finalPermissionIds: number[] = [];

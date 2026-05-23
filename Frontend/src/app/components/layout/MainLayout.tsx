@@ -36,7 +36,7 @@ const iconMap: Record<string, any> = {
 };
 
 export function MainLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mastersOpen, setMastersOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -52,6 +52,27 @@ export function MainLayout() {
     const saved = localStorage.getItem("crm_selected_modules");
     return saved ? JSON.parse(saved) : null;
   });
+
+  // Track window size to close sidebar by default on tablet/mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+    handleResize(); // run on mount
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Close sidebar on navigation on mobile/tablet
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (selectedModules) {
@@ -126,15 +147,31 @@ export function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
+      {/* Sidebar Backdrop Overlay on Mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`${
-          sidebarOpen ? "w-64" : "w-0"
-        } bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden flex flex-col`}
+        className={`fixed inset-y-0 left-0 z-50 lg:z-auto lg:static w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out lg:transition-all lg:duration-300 ${
+          sidebarOpen 
+            ? "translate-x-0 lg:w-64" 
+            : "-translate-x-full lg:translate-x-0 lg:w-0"
+        } overflow-hidden`}
       >
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h1 className="font-bold text-xl text-blue-600">CRM Pro</h1>
+          <button 
+            className="lg:hidden p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex-1 p-4 overflow-y-auto">
@@ -217,23 +254,23 @@ export function MainLayout() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 md:gap-4 flex-1">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {sidebarOpen ? <X className="w-5 h-5 lg:block hidden" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            <div className="relative w-96">
+            <div className="relative flex-1 max-w-[240px] md:max-w-md hidden sm:block">
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search leads, customers, products..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           </div>

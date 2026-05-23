@@ -117,6 +117,29 @@ export class LeadsService {
       }
     }
 
+    let finalProductId = productId;
+    if (finalProductId) {
+      const exists = await this.prisma.masterData.findUnique({ where: { id: finalProductId } });
+      if (!exists) {
+        finalProductId = undefined;
+      }
+    }
+
+    let finalAssignedToId = assignedToId;
+    if (finalAssignedToId) {
+      const exists = await this.prisma.user.findUnique({ where: { id: finalAssignedToId } });
+      if (!exists) {
+        finalAssignedToId = undefined;
+      }
+    }
+
+    if (finalCustomerId) {
+      const exists = await this.prisma.masterData.findUnique({ where: { id: finalCustomerId } });
+      if (!exists) {
+        finalCustomerId = undefined;
+      }
+    }
+
     const count = await this.prisma.lead.count();
     const leadNumber = `LD-${String(count + 1).padStart(4, '0')}`;
 
@@ -126,8 +149,8 @@ export class LeadsService {
         leadNumber,
         status: initialStatus,
         customer: finalCustomerId ? { connect: { id: finalCustomerId } } : undefined,
-        product: productId ? { connect: { id: productId } } : undefined,
-        assignedTo: assignedToId ? { connect: { id: assignedToId } } : undefined,
+        product: finalProductId ? { connect: { id: finalProductId } } : undefined,
+        assignedTo: finalAssignedToId ? { connect: { id: finalAssignedToId } } : undefined,
         history: {
           create: {
             oldStatus: initialStatus,
@@ -294,6 +317,29 @@ export class LeadsService {
       }
     }
 
+    let finalProductId = productId;
+    if (finalProductId) {
+      const exists = await this.prisma.masterData.findUnique({ where: { id: finalProductId } });
+      if (!exists) {
+        finalProductId = undefined;
+      }
+    }
+
+    let finalAssignedToId = assignedToId;
+    if (finalAssignedToId) {
+      const exists = await this.prisma.user.findUnique({ where: { id: finalAssignedToId } });
+      if (!exists) {
+        finalAssignedToId = undefined;
+      }
+    }
+
+    if (finalCustomerId) {
+      const exists = await this.prisma.masterData.findUnique({ where: { id: finalCustomerId } });
+      if (!exists) {
+        finalCustomerId = undefined;
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedLead = await tx.lead.update({
         where: { id: leadId },
@@ -302,8 +348,8 @@ export class LeadsService {
           status: newStatus,
           isConverted: newStatus === LeadStatus.WON ? true : lead.isConverted,
           customer: finalCustomerId ? { connect: { id: finalCustomerId } } : finalCustomerId === null ? { disconnect: true } : undefined,
-          product: productId ? { connect: { id: productId } } : productId === null ? { disconnect: true } : undefined,
-          assignedTo: assignedToId ? { connect: { id: assignedToId } } : assignedToId === null ? { disconnect: true } : undefined,
+          product: finalProductId ? { connect: { id: finalProductId } } : finalProductId === null ? { disconnect: true } : undefined,
+          assignedTo: finalAssignedToId ? { connect: { id: finalAssignedToId } } : finalAssignedToId === null ? { disconnect: true } : undefined,
         },
         include: {
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
@@ -442,10 +488,10 @@ export class LeadsService {
     const todayFollowupsGroup = await this.prisma.leadFollowup.groupBy({
       by: ['leadId'],
       where: {
-        callDate: {
-          gte: startOfToday,
-          lte: endOfToday,
-        },
+        OR: [
+          { callDate: { gte: startOfToday, lte: endOfToday } },
+          { nextFollowupDate: { gte: startOfToday, lte: endOfToday } }
+        ]
       },
     });
     const todayFollowups = todayFollowupsGroup.length;

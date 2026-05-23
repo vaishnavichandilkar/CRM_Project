@@ -789,6 +789,14 @@ export function LeadsPage() {
         return <Badge variant={variant} className="rounded-lg font-bold text-[10px] tracking-tight uppercase px-2.5 py-1">{displayLabel}</Badge>;
       },
     },
+    {
+      key: "distance",
+      label: "Distance",
+      render: (value: any, row: any) => {
+        const dist = row.customerData?.distance || row.leadData?.distance || row.distance || "";
+        return <span className="font-semibold text-slate-700">{dist ? `${dist} km` : "N/A"}</span>;
+      }
+    },
     { 
       key: "assignedTo", 
       label: "Assigned Representative", 
@@ -815,10 +823,16 @@ export function LeadsPage() {
     }
     if (activeFilter === "TODAY_FOLLOWUPS") {
       if (!lead.followups || !Array.isArray(lead.followups)) return false;
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const today = new Date();
+      const isTodayLocal = (dateVal: any) => {
+        if (!dateVal) return false;
+        const d = new Date(dateVal);
+        return d.getDate() === today.getDate() &&
+               d.getMonth() === today.getMonth() &&
+               d.getFullYear() === today.getFullYear();
+      };
       return lead.followups.some((f: any) => {
-        const fDate = new Date(f.callDate).toISOString().slice(0, 10);
-        return fDate === todayStr;
+        return isTodayLocal(f.callDate) || isTodayLocal(f.nextFollowupDate);
       });
     }
     if (activeFilter === "CONVERTED") {
@@ -863,28 +877,39 @@ export function LeadsPage() {
 
   const handleDownloadSampleCSV = () => {
     const headers = [
-      "sr.no",
-      "name",
-      "phone number",
-      "villaage",
-      "taluka",
-      "district",
-      "type",
-      "qty/tones",
-      "lead_status",
-      "call_status"
+      "Sr.no",
+      "No. of Cattle",
+      "Monthly Using",
+      "Need QTY",
+      "Customers Name",
+      "Phone Number",
+      "Village",
+      "Taluka",
+      "Dist",
+      "Customer Type",
+      "Distance",
+      "Order QTY",
+      "Rate",
+      "Calling Status",
+      "Lead Status",
+      "Follow-up Date"
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     
-    // Pre-format Column C (phone number) as text for the first 100 rows so typed entries remain text
-    const range = { s: { r: 0, c: 0 }, e: { r: 100, c: 9 } };
+    // Pre-format Column F (phone number, index 5) as text for the first 100 rows so typed entries remain text
+    const range = { s: { r: 0, c: 0 }, e: { r: 100, c: 15 } };
     ws['!ref'] = XLSX.utils.encode_range(range);
     for (let r = 1; r <= 100; r++) {
-      const cellAddress = XLSX.utils.encode_cell({ r, c: 2 });
+      const cellAddress = XLSX.utils.encode_cell({ r, c: 5 });
       ws[cellAddress] = ws[cellAddress] || { t: 's', v: '' };
       ws[cellAddress].z = '@';
     }
+
+    // Auto-fit column widths to ensure column names and data are clearly visible
+    ws['!cols'] = headers.map(header => ({
+      wch: Math.max(header.length + 5, 14)
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Leads Template");
@@ -905,6 +930,7 @@ export function LeadsPage() {
       "Company Name",
       "GST Number",
       "Address",
+      "Distance",
       "City",
       "State",
       "Country",
@@ -936,6 +962,7 @@ export function LeadsPage() {
       lead.companyName || "",
       lead.gstNumber || "",
       lead.address || "",
+      lead.customerData?.distance || lead.leadData?.distance || lead.distance || "",
       lead.city || "",
       lead.state || "",
       lead.country || "",
@@ -969,6 +996,18 @@ export function LeadsPage() {
         }
       });
     }
+
+    // Dynamic auto-fit column widths based on maximum length of cell contents
+    ws['!cols'] = headers.map((header, colIdx) => {
+      let maxLen = header.length;
+      rows.forEach(row => {
+        const valStr = String(row[colIdx] !== undefined && row[colIdx] !== null ? row[colIdx] : "");
+        if (valStr.length > maxLen) {
+          maxLen = valStr.length;
+        }
+      });
+      return { wch: Math.max(maxLen + 4, 12) }; // Add 4 characters padding, min width 12
+    });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Leads Data");
@@ -1021,19 +1060,20 @@ export function LeadsPage() {
             const rawVal = row[index] !== undefined && row[index] !== null ? row[index] : "";
             const val = String(rawVal).trim();
             if (header === "lead number" || header === "leadid" || header === "lead_number") leadObj.leadNumber = val;
-            else if (header === "status" || header === "lead_status") leadObj.status = val.toUpperCase().replace(" ", "_") || "OPEN";
+            else if (header === "status" || header === "lead_status" || header === "lead status") leadObj.status = val.toUpperCase().replace(" ", "_") || "OPEN";
             else if (header === "source") leadObj.source = val.toUpperCase().replace(" ", "_") || "OTHER";
-            else if (header === "notes" || header === "call_status") leadObj.notes = val;
-            else if (header === "customer name" || header === "name") leadObj.customerName = val;
+            else if (header === "notes" || header === "call_status" || header === "calling status") leadObj.notes = val;
+            else if (header === "customer name" || header === "name" || header === "customers name") leadObj.customerName = val;
             else if (header === "email") leadObj.email = val;
             else if (header === "mobile number" || header === "phone" || header === "contact" || header === "phone number") leadObj.mobileNumber = val;
             else if (header === "alternate mobile" || header === "alternate_mobile") leadObj.alternateMobile = val;
             else if (header === "company name" || header === "company") leadObj.companyName = val;
             else if (header === "gst number" || header === "gst") leadObj.gstNumber = val;
             else if (header === "address") leadObj.address = val;
-            else if (header === "city" || header === "villaage") leadObj.city = val;
+            else if (header === "distance") leadObj.distance = val;
+            else if (header === "city" || header === "villaage" || header === "village") leadObj.city = val;
             else if (header === "state" || header === "taluka") leadObj.state = val;
-            else if (header === "country" || header === "district") leadObj.country = val;
+            else if (header === "country" || header === "district" || header === "dist") leadObj.country = val;
             else if (header === "pincode" || header === "zip") leadObj.pincode = val;
             else if (header === "customer type" || header === "type") leadObj.customerType = val;
             else if (header === "contact person" || header === "contact_person") leadObj.contactPerson = val;
@@ -1042,10 +1082,15 @@ export function LeadsPage() {
             else if (header === "category") leadObj.category = val;
             else if (header === "brand") leadObj.brand = val;
             else if (header === "unit") leadObj.unit = val;
-            else if (header === "price") leadObj.price = parseFloat(val) || 0;
+            else if (header === "price" || header === "rate") leadObj.price = parseFloat(val) || 0;
             else if (header === "tax") leadObj.tax = parseFloat(val) || 0;
-            else if (header === "stock quantity" || header === "qty" || header === "qty/tones") leadObj.stockQuantity = parseInt(val) || 0;
+            else if (header === "stock quantity" || header === "qty" || header === "qty/tones" || header === "order qty") leadObj.stockQuantity = parseInt(val) || 0;
             else if (header === "description") leadObj.description = val;
+            // Custom Lead/Enquiry attributes
+            else if (header === "no. of cattle" || header === "no of cattle") leadObj.noOfCattle = val;
+            else if (header === "monthly using") leadObj.monthlyUsing = val;
+            else if (header === "need qty") leadObj.needQty = val;
+            else if (header === "follow-up date" || header === "followup date") leadObj.followupDate = val;
           });
 
           if (!leadObj.customerName) {
@@ -1100,7 +1145,7 @@ export function LeadsPage() {
             pincode: leadObj.pincode || "",
             customerType: leadObj.customerType || "Retail",
             contactPerson: leadObj.contactPerson || "",
-            productName: leadObj.productName || "",
+            productName: leadObj.productName || "Product",
             productCode: leadObj.productCode || "",
             category: leadObj.category || "General",
             brand: leadObj.brand || "",
@@ -1111,18 +1156,27 @@ export function LeadsPage() {
             description: leadObj.description || "",
             customerData: {
               name: leadObj.customerName,
-              email: leadObj.email || "",
               phone: leadObj.mobileNumber || "",
-              region: "North",
               type: leadObj.customerType || "Retail",
-              address: leadObj.address || "",
+              noOfCattle: leadObj.noOfCattle || "",
+              monthlyUsing: leadObj.monthlyUsing || "",
+              needQty: leadObj.needQty || "",
               villaage: leadObj.city || "",
               taluka: leadObj.state || "",
-              district: leadObj.country || ""
+              district: leadObj.country || "",
+              distance: leadObj.distance || ""
             },
-            productData: leadObj.productName ? {
+            leadData: {
+              notes: leadObj.notes || "",
+              vehicleType: "Other",
+              noOfCattle: leadObj.noOfCattle || "",
+              monthlyUsing: leadObj.monthlyUsing || "",
+              needQty: leadObj.needQty || "",
+              followupDate: leadObj.followupDate || "",
+            },
+            productData: {
               selectedProducts: [{
-                name: leadObj.productName,
+                name: leadObj.productName || "Product",
                 price: leadObj.price || 0,
                 tax: leadObj.tax || 0,
                 qty: leadObj.stockQuantity || 1,
@@ -1130,12 +1184,32 @@ export function LeadsPage() {
                 description: leadObj.description || "",
                 afterDiscountPrice: (leadObj.price || 0) * (leadObj.stockQuantity || 1)
               }]
-            } : undefined
+            }
           };
 
           try {
-            await leadsService.createLead(payload);
+            const created = await leadsService.createLead(payload);
             successCount++;
+            
+            // If follow-up date is provided, automatically schedule a follow-up call event in the DB!
+            if (leadObj.followupDate && created?.id) {
+              try {
+                let callDateStr = new Date(leadObj.followupDate).toISOString().slice(0, 10);
+                if (callDateStr && callDateStr !== "NaN-NaN-NaN") {
+                  await leadsService.createFollowup(created.id, {
+                    callDate: callDateStr,
+                    callTime: "10:00",
+                    callType: "Outgoing",
+                    conversation: leadObj.notes || "Imported Scheduled Follow-up",
+                    nextFollowupDate: callDateStr,
+                    assignedEmployee: "",
+                  });
+                }
+              } catch (fErr) {
+                console.error("Failed to automatically create followup for imported row:", fErr);
+              }
+            }
+
             if (importToastId) toast.loading(`Importing leads... (${successCount}/${rows.length})`, { id: importToastId });
           } catch (err) {
             console.error(`Row ${i} import failed`, err);
@@ -1924,34 +1998,66 @@ export function LeadsPage() {
                 Lead History & Call Reschedule Timeline
               </h3>
 
-              <div className="relative border-l border-slate-200 pl-5 space-y-6 max-h-96 overflow-y-auto pr-2">
-                {selectedLead?.history && selectedLead.history.map((hist: any, index: number) => (
-                  <div key={index} className="relative group">
-                    <span className="absolute -left-[27px] top-1.5 bg-indigo-50 text-indigo-600 border border-indigo-200/50 w-3 h-3 rounded-full flex items-center justify-center group-hover:scale-125 transition-transform" />
-                    
-                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100/80">
-                      <div className="flex justify-between items-center text-xs mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-700">{hist.changedBy ? `${hist.changedBy.firstName} ${hist.changedBy.lastName}` : 'System'}</span>
-                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold uppercase">Status Transition</span>
-                        </div>
-                        <span className="text-slate-400 font-medium">{new Date(hist.timestamp).toLocaleDateString()} {new Date(hist.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      
-                      <div className="flex gap-2 items-center mb-2">
-                        <Badge variant="ghost" className="text-[9px] border border-slate-200">{hist.oldStatus}</Badge>
-                        <span className="text-slate-400 text-xs">→</span>
-                        <Badge variant="info" className="text-[9px] uppercase">{hist.newStatus}</Badge>
-                      </div>
+              <div className="relative border-l-2 border-slate-100 pl-6 space-y-5 max-h-[500px] overflow-y-auto pr-2 py-2 scrollbar-thin">
+                {selectedLead?.history && selectedLead.history.map((hist: any, index: number) => {
+                  const getStatusVariant = (status: string) => {
+                    const s = (status || "").toUpperCase();
+                    if (s === "WON" || s === "WON/CLOSED" || s === "WON (CONVERT TO SALES)") return "success";
+                    if (s === "IN_PROGRESS" || s === "IN PROGRESS") return "warning";
+                    if (s === "LOST") return "danger";
+                    return "info";
+                  };
 
-                      {hist.remarks && (
-                        <p className="text-xs text-slate-600 bg-white/70 p-2.5 rounded-lg border border-slate-100 font-medium italic mt-1.5 leading-relaxed">
-                          "{hist.remarks}"
-                        </p>
-                      )}
+                  const getStatusLabel = (status: string) => {
+                    const s = (status || "").toUpperCase();
+                    if (s === "WON") return "WON/CLOSED";
+                    if (s === "IN_PROGRESS") return "IN PROGRESS";
+                    return s;
+                  };
+
+                  return (
+                    <div key={index} className="relative group">
+                      {/* Perfectly centered dot on the line */}
+                      <span className="absolute -left-[33px] top-[20px] bg-white border-2 border-indigo-500 w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-sm group-hover:scale-125 transition-all duration-200 z-10" />
+                      
+                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:shadow-md transition-all duration-200 space-y-3">
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-50">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-700">
+                              {hist.changedBy ? `${hist.changedBy.firstName} ${hist.changedBy.lastName}` : 'System'}
+                            </span>
+                            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50/50 border border-indigo-100/30 px-1.5 py-0.5 rounded uppercase">
+                              Status Transition
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-350" />
+                            {new Date(hist.timestamp).toLocaleDateString()} {new Date(hist.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                          <span className="text-slate-400 font-medium">Status transition:</span>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={getStatusVariant(hist.oldStatus)} className="text-[9px] font-bold uppercase rounded px-2 py-0.5">
+                              {getStatusLabel(hist.oldStatus)}
+                            </Badge>
+                            <span className="text-slate-400 text-xs">→</span>
+                            <Badge variant={getStatusVariant(hist.newStatus)} className="text-[9px] font-bold uppercase rounded px-2 py-0.5">
+                              {getStatusLabel(hist.newStatus)}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {hist.remarks && (
+                          <p className="text-xs text-slate-600 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100/50 font-medium italic mt-1 leading-relaxed">
+                            "{hist.remarks}"
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {followupsList.length === 0 && (!selectedLead?.history || selectedLead.history.length === 0) && (
                   <div className="p-8 text-center text-slate-400 text-xs font-semibold">
