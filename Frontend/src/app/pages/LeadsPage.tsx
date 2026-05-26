@@ -15,6 +15,317 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useLocation } from "react-router";
 
+interface SearchableCustomerSelectProps {
+  label?: string;
+  required?: boolean;
+  value: string;
+  customers: { id: number; name: string }[];
+  onChange: (e: { target: { value: string } }) => void;
+  placeholder?: string;
+}
+
+function SearchableCustomerSelect({
+  label,
+  required = false,
+  value,
+  customers,
+  onChange,
+  placeholder = "Select Customer..."
+}: SearchableCustomerSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Reset search when opening/closing
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm("");
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [isOpen]);
+
+  const selectedCustomer = customers.find(c => c.id.toString() === value);
+
+  const filteredCustomers = customers.filter(c =>
+    (c.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="relative flex flex-col gap-1 w-full" ref={containerRef}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
+      
+      {/* Trigger: Input if open, Button if closed */}
+      {isOpen ? (
+        <div className="relative w-full">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={selectedCustomer ? selectedCustomer.name : placeholder}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 border border-blue-500 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm min-h-[38px] pr-8"
+          />
+          <span
+            onClick={() => setIsOpen(false)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+            </svg>
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="w-full px-3 py-2 border border-gray-300 bg-white text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center text-sm cursor-pointer shadow-sm min-h-[38px] hover:border-gray-400 transition-colors"
+        >
+          <span className={selectedCustomer ? "text-gray-900 font-semibold" : "text-gray-400"}>
+            {selectedCustomer ? selectedCustomer.name : placeholder}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {selectedCustomer && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange({ target: { value: "" } });
+                }}
+                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                title="Clear selection"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </span>
+            )}
+            <svg
+              className="w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+      )}
+
+      {/* Dropdown Panel */}
+      {isOpen && (
+        <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] flex flex-col overflow-hidden animate-in fade-in-50 slide-in-from-top-1 duration-100">
+          
+          {/* Customers List - height limited to exactly 10 visible items (approx 36px per item) */}
+          <div className="overflow-y-auto max-h-[360px] divide-y divide-slate-50">
+            {filteredCustomers.length > 0 ? (
+              filteredCustomers.map((c) => {
+                const isSelected = c.id.toString() === value;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      onChange({ target: { value: c.id.toString() } });
+                      setIsOpen(false);
+                    }}
+                    className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between hover:bg-slate-50 transition-colors font-medium ${
+                      isSelected ? "bg-blue-50/40 text-blue-600 font-bold" : "text-slate-700"
+                    }`}
+                  >
+                    <span>{c.name}</span>
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-4 py-8 text-center text-xs text-slate-400 font-semibold">
+                No matching customers found
+              </div>
+            )}
+          </div>
+
+          {/* Fixed bottom "+ Add New Customer" option */}
+          <button
+            type="button"
+            onClick={() => {
+              onChange({ target: { value: "new" } });
+              setIsOpen(false);
+            }}
+            className="w-full px-4 py-3 bg-slate-100 text-left text-sm font-bold text-slate-700 border-t border-slate-200 hover:bg-slate-200/80 hover:text-slate-900 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-slate-500" />
+            Add New Customer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SearchableProductSelectProps {
+  label?: string;
+  value: string;
+  products: { id: number; name: string }[];
+  onChange: (e: { target: { value: string } }) => void;
+  placeholder?: string;
+}
+
+function SearchableProductSelect({
+  label,
+  value,
+  products,
+  onChange,
+  placeholder = "Select Product to Add..."
+}: SearchableProductSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Reset search when opening/closing
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm("");
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [isOpen]);
+
+  const filteredProducts = products.filter(p =>
+    (p.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="relative flex flex-col gap-1 w-full" ref={containerRef}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700">
+          {label}
+        </label>
+      )}
+      
+      {/* Trigger: Input if open, Button if closed */}
+      {isOpen ? (
+        <div className="relative w-full">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={placeholder}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 border border-blue-500 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm min-h-[38px] pr-8"
+          />
+          <span
+            onClick={() => setIsOpen(false)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+            </svg>
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="w-full px-3 py-2 border border-gray-300 bg-white text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center text-sm cursor-pointer shadow-sm min-h-[38px] hover:border-gray-400 transition-colors text-gray-400"
+        >
+          <span>{placeholder}</span>
+          <svg
+            className="w-4 h-4 text-gray-400 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Dropdown Panel */}
+      {isOpen && (
+        <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] flex flex-col overflow-hidden animate-in fade-in-50 slide-in-from-top-1 duration-100">
+          
+          {/* Products List - height limited to exactly 10 visible items (approx 36px per item) */}
+          <div className="overflow-y-auto max-h-[360px] divide-y divide-slate-50">
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map((p) => {
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      onChange({ target: { value: p.id.toString() } });
+                      setIsOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors font-medium text-slate-700"
+                  >
+                    {p.name}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-4 py-8 text-center text-xs text-slate-400 font-semibold">
+                No matching products found
+              </div>
+            )}
+          </div>
+
+          {/* Fixed bottom "+ Add New Product" option */}
+          <button
+            type="button"
+            onClick={() => {
+              onChange({ target: { value: "new" } });
+              setIsOpen(false);
+            }}
+            className="w-full px-4 py-3 bg-slate-100 text-left text-sm font-bold text-slate-700 border-t border-slate-200 hover:bg-slate-200/80 hover:text-slate-900 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-slate-500" />
+            Add New Product
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LeadsPage() {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
@@ -33,12 +344,14 @@ export function LeadsPage() {
     upcomingFollowups: 0,
     missedFollowups: 0,
     completedFollowups: 0,
+    totalFollowups: 0,
   });
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [followupFilter, setFollowupFilter] = useState<"today" | "upcoming" | "missed" | "completed">("today");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
+  const [followupViewMode, setFollowupViewMode] = useState<"today" | "total">("today");
   const [followupsList, setFollowupsList] = useState<any[]>([]);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
@@ -845,17 +1158,22 @@ export function LeadsPage() {
     }
     if (activeFilter === "TODAY_FOLLOWUPS") {
       if (!lead.followups || !Array.isArray(lead.followups)) return false;
-      const today = new Date();
-      const isTodayLocal = (dateVal: any) => {
-        if (!dateVal) return false;
-        const d = new Date(dateVal);
-        return d.getDate() === today.getDate() &&
-               d.getMonth() === today.getMonth() &&
-               d.getFullYear() === today.getFullYear();
-      };
-      return lead.followups.some((f: any) => {
-        return isTodayLocal(f.callDate) || isTodayLocal(f.nextFollowupDate);
-      });
+      
+      if (followupViewMode === "today") {
+        const today = new Date();
+        const isTodayLocal = (dateVal: any) => {
+          if (!dateVal) return false;
+          const d = new Date(dateVal);
+          return d.getDate() === today.getDate() &&
+                 d.getMonth() === today.getMonth() &&
+                 d.getFullYear() === today.getFullYear();
+        };
+        return lead.followups.some((f: any) => {
+          return isTodayLocal(f.callDate) || isTodayLocal(f.nextFollowupDate);
+        });
+      } else {
+        return lead.followups.length > 0;
+      }
     }
     if (activeFilter === "CONVERTED") {
       return lead.isConverted === true;
@@ -1116,8 +1434,7 @@ export function LeadsPage() {
           });
 
           if (!leadObj.customerName) {
-            failCount++;
-            continue;
+            leadObj.customerName = leadObj.companyName || leadObj.contactPerson || leadObj.mobileNumber || leadObj.email || "Unknown Customer";
           }
 
           const sigName = (leadObj.customerName || "").trim().toLowerCase();
@@ -1197,7 +1514,7 @@ export function LeadsPage() {
             unit: String(leadObj.unit || ""),
             price: Number(leadObj.price) || 0,
             tax: Number(leadObj.tax) || 0,
-            stockQuantity: Number(leadObj.stockQuantity) || 0,
+            stockQuantity: Math.floor(Number(leadObj.stockQuantity)) || 0,
             description: String(leadObj.description || ""),
             customerData: {
               name: String(leadObj.customerName || ""),
@@ -1224,10 +1541,10 @@ export function LeadsPage() {
                 name: String(leadObj.productName || "Product"),
                 price: Number(leadObj.price) || 0,
                 tax: Number(leadObj.tax) || 0,
-                qty: Number(leadObj.stockQuantity) || 1,
+                qty: Math.floor(Number(leadObj.stockQuantity)) || 1,
                 category: String(leadObj.category || "General"),
                 description: String(leadObj.description || ""),
-                afterDiscountPrice: (Number(leadObj.price) || 0) * (Number(leadObj.stockQuantity) || 1)
+                afterDiscountPrice: (Number(leadObj.price) || 0) * (Math.floor(Number(leadObj.stockQuantity)) || 1)
               }]
             }
           };
@@ -1256,12 +1573,21 @@ export function LeadsPage() {
             }
 
             if (importToastId) toast.loading(`Importing leads... (${successCount}/${rows.length})`, { id: importToastId });
-          } catch (err) {
-            console.error(`Row ${i} import failed`, err);
+          } catch (err: any) {
+            console.error(`Row ${i} import failed`, err?.response?.data || err);
+            if (err?.response?.data?.message) {
+              const msg = Array.isArray(err.response.data.message) ? err.response.data.message.join(', ') : err.response.data.message;
+              console.error(`Validation Error: ${msg}`);
+              if (!window.sessionStorage.getItem('firstImportError')) {
+                 window.sessionStorage.setItem('firstImportError', 'true');
+                 toast.error(`Validation error on row ${i + 1}: ${msg}`);
+              }
+            }
             failCount++;
           }
         }
 
+        window.sessionStorage.removeItem('firstImportError');
         if (importToastId) toast.dismiss(importToastId);
         setIsImportModalOpen(false);
         setSelectedImportFile(null);
@@ -1317,7 +1643,7 @@ export function LeadsPage() {
           { label: 'Total Enquiries', value: dashboardStats.totalLeads, color: 'text-indigo-600 border-indigo-100', icon: Database, bg: 'bg-indigo-50/50', filterKey: 'ALL', ringColor: 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100/50' },
           { label: 'In Progress', value: dashboardStats.inProgressLeads, color: 'text-orange-600 border-orange-100', icon: Clock, bg: 'bg-orange-50/50', filterKey: 'ACTIVE_PIPELINE', ringColor: 'ring-2 ring-orange-500 border-transparent shadow-orange-100/50' },
           { label: 'Won / Closed', value: dashboardStats.wonLeads, color: 'text-emerald-600 border-emerald-100', icon: CheckCircle2, bg: 'bg-emerald-50/50', filterKey: 'WON_CLOSED', ringColor: 'ring-2 ring-emerald-500 border-transparent shadow-emerald-100/50' },
-          { label: 'Today Follow-ups', value: dashboardStats.todayFollowups, color: 'text-rose-600 border-rose-100', icon: Phone, bg: 'bg-rose-50/50', filterKey: 'TODAY_FOLLOWUPS', ringColor: 'ring-2 ring-rose-500 border-transparent shadow-rose-100/50' },
+          { label: 'Today / Total Follow-ups', value: `${dashboardStats.todayFollowups} / ${dashboardStats.totalFollowups || 0}`, color: 'text-rose-600 border-rose-100', icon: Phone, bg: 'bg-rose-50/50', filterKey: 'TODAY_FOLLOWUPS', ringColor: 'ring-2 ring-rose-500 border-transparent shadow-rose-100/50' },
           { label: 'Sales Converted', value: dashboardStats.convertedSales, color: 'text-blue-600 border-blue-100', icon: Landmark, bg: 'bg-blue-50/50', filterKey: 'CONVERTED', ringColor: 'ring-2 ring-blue-500 border-transparent shadow-blue-100/50' },
         ].map((stat, idx) => {
           const isActive = activeFilter === stat.filterKey;
@@ -1347,11 +1673,42 @@ export function LeadsPage() {
       <Card className="border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] rounded-2xl overflow-hidden bg-white">
         <CardHeader className="px-8 py-5 border-b border-slate-100/80 bg-slate-50/20 flex flex-row items-center justify-between">
           <CardTitle className="text-base font-bold text-slate-800">
-            {activeFilter === "ALL" && "All Registered Leads"}
-            {activeFilter === "ACTIVE_PIPELINE" && "In Progress Leads"}
-            {activeFilter === "WON_CLOSED" && "Won & Closed Leads"}
-            {activeFilter === "TODAY_FOLLOWUPS" && "Today's Scheduled Follow-ups"}
-            {activeFilter === "CONVERTED" && "Converted Sales Leads"}
+            {activeFilter === "TODAY_FOLLOWUPS" ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-base font-bold text-slate-800">Follow-up Enquiries:</span>
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => setFollowupViewMode("today")}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all active:scale-95 cursor-pointer ${
+                      followupViewMode === "today"
+                        ? "bg-white text-rose-600 shadow-sm border border-slate-200/40"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Today's Scheduled
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFollowupViewMode("total")}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all active:scale-95 cursor-pointer ${
+                      followupViewMode === "total"
+                        ? "bg-white text-indigo-600 shadow-sm border border-slate-200/40"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Total Follow-ups
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {activeFilter === "ALL" && "All Registered Leads"}
+                {activeFilter === "ACTIVE_PIPELINE" && "In Progress Leads"}
+                {activeFilter === "WON_CLOSED" && "Won & Closed Leads"}
+                {activeFilter === "CONVERTED" && "Converted Sales Leads"}
+              </>
+            )}
           </CardTitle>
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-full">
             {filteredLeadsList.length} {filteredLeadsList.length === 1 ? 'Lead' : 'Leads'}
@@ -1472,7 +1829,7 @@ export function LeadsPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    <Select
+                    <SearchableCustomerSelect
                       label="Customer Name"
                       required
                       value={formData.customerId?.toString() || ""}
@@ -1498,10 +1855,7 @@ export function LeadsPage() {
                           }
                         }
                       }}
-                      options={[
-                        ...customers.map(c => ({ value: c.id.toString(), label: c.name })),
-                        { value: "new", label: "+ Add New Customer" }
-                      ]}
+                      customers={customers}
                       placeholder="Select Customer..."
                     />
                   </div>
@@ -1550,21 +1904,40 @@ export function LeadsPage() {
 
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select
+                  <SearchableProductSelect
                     label="Add Product"
                     value=""
                     onChange={(e) => {
-                      const id = parseInt(e.target.value);
-                      if (id) {
-                        handleAddProduct(id);
+                      const val = e.target.value;
+                      if (val === "new") {
+                        setSelectedProducts(prev => [
+                          ...prev,
+                          {
+                            id: -1 * Date.now(),
+                            name: "",
+                            sku: "",
+                            category: "General",
+                            brand: "",
+                            unit: "",
+                            price: 0,
+                            tax: 0,
+                            stockQuantity: 0,
+                            description: "",
+                            productData: {},
+                            qty: 1,
+                            discountPercent: 0,
+                            discountAmount: 0,
+                            afterDiscountPrice: 0
+                          }
+                        ]);
+                      } else {
+                        const id = parseInt(val);
+                        if (id) {
+                          handleAddProduct(id);
+                        }
                       }
                     }}
-                    options={[
-                      { value: "", label: "Choose a product..." },
-                      ...products
-                        .filter(p => !selectedProducts.some(sp => sp.id === p.id))
-                        .map(p => ({ value: p.id.toString(), label: p.name }))
-                    ]}
+                    products={products.filter(p => !selectedProducts.some(sp => sp.id === p.id))}
                     placeholder="Select Product to Add..."
                   />
                 </div>

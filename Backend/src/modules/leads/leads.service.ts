@@ -569,6 +569,11 @@ export class LeadsService {
 
     const convertedSales = await this.prisma.lead.count({ where: { isConverted: true } });
 
+    const totalFollowupsGroup = await this.prisma.leadFollowup.groupBy({
+      by: ['leadId'],
+    });
+    const totalFollowups = totalFollowupsGroup.length;
+
     return {
       totalLeads,
       openLeads,
@@ -580,6 +585,7 @@ export class LeadsService {
       upcomingFollowups,
       missedFollowups,
       completedFollowups,
+      totalFollowups,
     };
   }
 
