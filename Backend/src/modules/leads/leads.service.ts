@@ -617,13 +617,25 @@ export class LeadsService {
       }
     });
 
-    // Auto-update lead status to IN_PROGRESS if OPEN
+    // Sync calling status back to the main Lead record, and auto-update status to IN_PROGRESS if OPEN
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
+    
+    const leadUpdateData: any = {};
+    if (callStatus) {
+      leadUpdateData.callStatus = callStatus;
+    }
     if (lead && lead.status === LeadStatus.OPEN) {
+      leadUpdateData.status = LeadStatus.IN_PROGRESS;
+    }
+
+    if (Object.keys(leadUpdateData).length > 0) {
       await this.prisma.lead.update({
         where: { id: leadId },
-        data: { status: LeadStatus.IN_PROGRESS }
+        data: leadUpdateData
       });
+    }
+
+    if (lead && lead.status === LeadStatus.OPEN) {
       await this.prisma.leadHistory.create({
         data: {
           leadId,
