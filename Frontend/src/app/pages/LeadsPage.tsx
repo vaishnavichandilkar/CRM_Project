@@ -354,6 +354,7 @@ export function LeadsPage() {
   const [followupViewMode, setFollowupViewMode] = useState<"today" | "total">("today");
   const [followupsList, setFollowupsList] = useState<any[]>([]);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [callStatusFilter, setCallStatusFilter] = useState<string>("ALL");
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -375,6 +376,7 @@ export function LeadsPage() {
     assignedToId: "" as string | number,
     notes: "",
     status: "OPEN",
+    callStatus: "Connected",
 
     // Customer autofilled & editable fields
     customerName: "",
@@ -413,6 +415,7 @@ export function LeadsPage() {
     callDate: new Date().toISOString().slice(0, 10),
     callTime: new Date().toTimeString().slice(0, 5),
     callType: "Outgoing",
+    callStatus: "Connected",
     conversation: "",
     nextFollowupDate: "",
     assignedEmployee: "",
@@ -589,6 +592,7 @@ export function LeadsPage() {
       assignedToId: "",
       notes: "",
       status: "OPEN",
+      callStatus: "Connected",
       customerName: "",
       mobileNumber: "",
       alternateMobile: "",
@@ -635,6 +639,7 @@ export function LeadsPage() {
       assignedToId: lead.assignedToId || "",
       notes: lead.notes || "",
       status: lead.status || "OPEN",
+      callStatus: lead.callStatus || "Connected",
       customerName: lead.customerName || "",
       mobileNumber: lead.mobileNumber || "",
       alternateMobile: lead.alternateMobile || "",
@@ -719,6 +724,7 @@ export function LeadsPage() {
         callDate: new Date().toISOString().slice(0, 10),
         callTime: new Date().toTimeString().slice(0, 5),
         callType: "Outgoing",
+        callStatus: "Connected",
         conversation: "",
         nextFollowupDate: "",
         assignedEmployee: "",
@@ -1125,6 +1131,26 @@ export function LeadsPage() {
       },
     },
     {
+      key: "callStatus",
+      label: "Call Status",
+      sortable: true,
+      render: (value: string) => {
+        if (!value) return <span className="text-slate-400 text-xs font-semibold">N/A</span>;
+        const colorClass = 
+          value === "Connected" ? "bg-emerald-50 text-emerald-700 border-emerald-100/50" :
+          value === "Not Connected" ? "bg-rose-50 text-rose-700 border-rose-100/50" :
+          value === "Out of Service" ? "bg-amber-50 text-amber-700 border-amber-100/50" :
+          value === "Busy" ? "bg-blue-50 text-blue-700 border-blue-100/50" :
+          "bg-slate-50 text-slate-700 border-slate-200";
+
+        return (
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] tracking-tight font-bold uppercase border ${colorClass}`}>
+            {value}
+          </span>
+        );
+      }
+    },
+    {
       key: "distance",
       label: "Distance",
       render: (value: any, row: any) => {
@@ -1147,37 +1173,43 @@ export function LeadsPage() {
   ];
 
   const filteredLeadsList = leadsList.filter((lead: any) => {
+    let tabMatched = false;
     if (activeFilter === "ALL") {
-      return true;
-    }
-    if (activeFilter === "ACTIVE_PIPELINE") {
-      return lead.status === "IN_PROGRESS" || lead.status === "In Progress";
-    }
-    if (activeFilter === "WON_CLOSED") {
-      return lead.status === "WON" || lead.status === "LOST" || lead.status === "Won" || lead.status === "Lost";
-    }
-    if (activeFilter === "TODAY_FOLLOWUPS") {
-      if (!lead.followups || !Array.isArray(lead.followups)) return false;
-      
-      if (followupViewMode === "today") {
-        const today = new Date();
-        const isTodayLocal = (dateVal: any) => {
-          if (!dateVal) return false;
-          const d = new Date(dateVal);
-          return d.getDate() === today.getDate() &&
-                 d.getMonth() === today.getMonth() &&
-                 d.getFullYear() === today.getFullYear();
-        };
-        return lead.followups.some((f: any) => {
-          return isTodayLocal(f.callDate) || isTodayLocal(f.nextFollowupDate);
-        });
-      } else {
-        return lead.followups.length > 0;
+      tabMatched = true;
+    } else if (activeFilter === "ACTIVE_PIPELINE") {
+      tabMatched = lead.status === "IN_PROGRESS" || lead.status === "In Progress";
+    } else if (activeFilter === "WON_CLOSED") {
+      tabMatched = lead.status === "WON" || lead.status === "LOST" || lead.status === "Won" || lead.status === "Lost";
+    } else if (activeFilter === "TODAY_FOLLOWUPS") {
+      if (lead.followups && Array.isArray(lead.followups)) {
+        if (followupViewMode === "today") {
+          const today = new Date();
+          const isTodayLocal = (dateVal: any) => {
+            if (!dateVal) return false;
+            const d = new Date(dateVal);
+            return d.getDate() === today.getDate() &&
+                   d.getMonth() === today.getMonth() &&
+                   d.getFullYear() === today.getFullYear();
+          };
+          tabMatched = lead.followups.some((f: any) => {
+            return isTodayLocal(f.callDate) || isTodayLocal(f.nextFollowupDate);
+          });
+        } else {
+          tabMatched = lead.followups.length > 0;
+        }
       }
+    } else if (activeFilter === "CONVERTED") {
+      tabMatched = lead.isConverted === true;
     }
-    if (activeFilter === "CONVERTED") {
-      return lead.isConverted === true;
+
+    if (!tabMatched) return false;
+
+    if (callStatusFilter !== "ALL") {
+      const mainMatch = lead.callStatus === callStatusFilter;
+      const followupsMatch = lead.followups && Array.isArray(lead.followups) && lead.followups.some((f: any) => f.callStatus === callStatusFilter);
+      return mainMatch || followupsMatch;
     }
+
     return true;
   });
 
@@ -1672,7 +1704,7 @@ export function LeadsPage() {
       {/* Main Leads Table */}
       <Card className="border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] rounded-2xl overflow-hidden bg-white">
         <CardHeader className="px-8 py-5 border-b border-slate-100/80 bg-slate-50/20 flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-bold text-slate-800">
+          <CardTitle className="text-base font-bold text-slate-800 flex flex-wrap items-center gap-6">
             {activeFilter === "TODAY_FOLLOWUPS" ? (
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-base font-bold text-slate-800">Follow-up Enquiries:</span>
@@ -1709,6 +1741,21 @@ export function LeadsPage() {
                 {activeFilter === "CONVERTED" && "Converted Sales Leads"}
               </>
             )}
+
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-6 h-6">
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Call Status:</span>
+              <select
+                value={callStatusFilter}
+                onChange={(e) => setCallStatusFilter(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm hover:border-slate-300 transition-all cursor-pointer"
+              >
+                <option value="ALL">All Call Statuses</option>
+                <option value="Connected">Connected</option>
+                <option value="Not Connected">Not Connected</option>
+                <option value="Out of Service">Out of Service</option>
+                <option value="Busy">Busy</option>
+              </select>
+            </div>
           </CardTitle>
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-full">
             {filteredLeadsList.length} {filteredLeadsList.length === 1 ? 'Lead' : 'Leads'}
@@ -2213,13 +2260,25 @@ export function LeadsPage() {
                   ]}
                 />
 
+                <Select 
+                  label="Call Status" 
+                  value={formData.callStatus || "Connected"} 
+                  onChange={(e) => setFormData({ ...formData, callStatus: e.target.value })}
+                  options={[
+                    { value: "Connected", label: "Connected" },
+                    { value: "Not Connected", label: "Not Connected" },
+                    { value: "Out of Service", label: "Out of Service" },
+                    { value: "Busy", label: "Busy" }
+                  ]}
+                />
+
                 {leadConfig && leadConfig.length > 0 ? (
                   leadConfig.map((field: any) => {
                     // Skip native fields that are already hardcoded in the 3 sections
                     if ([
                       'customerName', 'mobileNumber', 'email', 'address', 'city', 'state', 'country', 'pincode', 'customerType',
                       'productName', 'productCode', 'category', 'price', 'stockQuantity', 'assignedToId',
-                      'source', 'status'
+                      'source', 'status', 'callStatus'
                     ].includes(field.key)) {
                       return null;
                     }
@@ -2556,22 +2615,36 @@ export function LeadsPage() {
                     ]}
                   />
 
+                  <Select
+                    label="Call Status"
+                    value={followupForm.callStatus || "Connected"}
+                    onChange={(e) => setFollowupForm({ ...followupForm, callStatus: e.target.value })}
+                    options={[
+                      { value: "Connected", label: "Connected" },
+                      { value: "Not Connected", label: "Not Connected" },
+                      { value: "Out of Service", label: "Out of Service" },
+                      { value: "Busy", label: "Busy" },
+                    ]}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <Input
                     label="Call Date"
                     type="date"
                     value={followupForm.callDate}
                     onChange={(e) => setFollowupForm({ ...followupForm, callDate: e.target.value })}
                   />
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
                   <Input
                     label="Call Time"
                     type="time"
                     value={followupForm.callTime}
                     onChange={(e) => setFollowupForm({ ...followupForm, callTime: e.target.value })}
                   />
+                </div>
 
+                <div className="grid grid-cols-1 gap-3">
                   <Input
                     label="Reschedule Next Date"
                     type="date"
@@ -2616,9 +2689,22 @@ export function LeadsPage() {
                   followupsList.map((f: any) => (
                     <div key={f.id} className="p-3.5 bg-white border border-slate-100 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:shadow-md transition-shadow relative">
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 mb-1.5">
-                        <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50/50 border border-indigo-100/30 px-1.5 py-0.5 rounded uppercase">
-                          <Phone className="w-3 h-3" /> {f.callType}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50/50 border border-indigo-100/30 px-1.5 py-0.5 rounded uppercase">
+                            <Phone className="w-3 h-3" /> {f.callType}
+                          </span>
+                          {f.callStatus && (
+                            <span className={`px-1.5 py-0.5 rounded uppercase border font-bold text-[9px] ${
+                              f.callStatus === "Connected" ? "bg-emerald-50 text-emerald-700 border-emerald-100/50" :
+                              f.callStatus === "Not Connected" ? "bg-rose-50 text-rose-700 border-rose-100/50" :
+                              f.callStatus === "Out of Service" ? "bg-amber-50 text-amber-700 border-amber-100/50" :
+                              f.callStatus === "Busy" ? "bg-blue-50 text-blue-700 border-blue-100/50" :
+                              "bg-slate-50 text-slate-700 border-slate-100/50"
+                            }`}>
+                              {f.callStatus}
+                            </span>
+                          )}
+                        </div>
                         <span>{new Date(f.callDate).toLocaleDateString()} {f.callTime}</span>
                       </div>
                       

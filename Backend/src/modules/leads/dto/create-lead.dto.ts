@@ -30,6 +30,10 @@ export class CreateLeadDto {
   @IsOptional()
   assignedToId?: number;
 
+  @IsString()
+  @IsOptional()
+  callStatus?: string;
+
   // Customer details
   @IsString()
   @IsOptional()

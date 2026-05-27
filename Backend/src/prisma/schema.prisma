@@ -116,6 +116,7 @@ model Lead {
   source       LeadSource    @default(OTHER)
   notes        String?
   isConverted  Boolean       @default(false) @map("is_converted")
+  callStatus   String?       @map("call_status")
 
   // Customer Details (Autofilled & Editable)
   customerName    String?    @map("customer_name")
@@ -229,6 +230,7 @@ model LeadFollowup {
   callDate         DateTime     @map("call_date")
   callTime         String       @map("call_time")
   callType         String       @map("call_type") // Incoming, Outgoing, Meeting, Demo
+  callStatus       String?      @map("call_status")
   conversation     String
   nextFollowupDate DateTime?    @map("next_followup_date")
   status           String       @default("PENDING")

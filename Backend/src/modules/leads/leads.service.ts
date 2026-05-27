@@ -351,6 +351,7 @@ export class LeadsService {
       'productData',
       'leadData',
       'isConverted',
+      'callStatus',
     ];
     for (const key of allowedLeadKeys) {
       if (leadData[key] !== undefined) {
@@ -590,7 +591,7 @@ export class LeadsService {
   }
 
   async createFollowup(leadId: number, dto: any) {
-    const { callDate, callTime, callType, conversation, nextFollowupDate, assignedEmployee } = dto;
+    const { callDate, callTime, callType, callStatus, conversation, nextFollowupDate, assignedEmployee } = dto;
     
     const followup = await this.prisma.leadFollowup.create({
       data: {
@@ -598,6 +599,7 @@ export class LeadsService {
         callDate: new Date(callDate),
         callTime,
         callType,
+        callStatus: callStatus || null,
         conversation,
         nextFollowupDate: nextFollowupDate ? new Date(nextFollowupDate) : null,
         assignedEmployee,
@@ -611,7 +613,7 @@ export class LeadsService {
         oldStatus: LeadStatus.IN_PROGRESS,
         newStatus: LeadStatus.IN_PROGRESS,
         changedById: dto.changedById || 1,
-        remarks: `Follow-up Logged: ${callType} - ${conversation.substring(0, 60)}...${nextFollowupDate ? ' Next follow-up on ' + nextFollowupDate : ''}`,
+        remarks: `Follow-up Logged: ${callType} (${callStatus || 'No Status'}) - ${conversation.substring(0, 60)}...${nextFollowupDate ? ' Next follow-up on ' + nextFollowupDate : ''}`,
       }
     });
 
